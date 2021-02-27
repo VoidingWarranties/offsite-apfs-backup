@@ -7,16 +7,16 @@ import (
 	"os"
 	"os/exec"
 
-	"apfs-snapshot-diff-clone/snapshot"
+	"apfs-snapshot-diff-clone/diskutil"
 )
 
 type ASR struct {}
 
-func (a ASR) Restore(source, target string, to, from snapshot.Snapshot) error {
+func (a ASR) Restore(source, target diskutil.VolumeInfo, to, from diskutil.Snapshot) error {
 	cmd := exec.Command(
 		"asr", "restore",
-		"--source", source,
-		"--target", target,
+		"--source", source.MountPoint,
+		"--target", target.MountPoint,
 		"--toSnapshot", to.UUID,
 		"--fromSnapshot", from.UUID,
 		"--erase", "--noprompt")

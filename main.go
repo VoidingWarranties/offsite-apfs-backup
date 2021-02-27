@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"apfs-snapshot-diff-clone/snapshot/cloner"
+	"apfs-snapshot-diff-clone/cloner"
 )
 
 var (

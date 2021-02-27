@@ -11,8 +11,6 @@ import (
 	"regexp"
 	"sort"
 	"time"
-
-	"apfs-snapshot-diff-clone/snapshot"
 )
 
 type DiskUtil struct {}
@@ -58,7 +56,17 @@ func (d DiskUtil) Info(volume string) (VolumeInfo, error) {
 	return info, nil
 }
 
-func (d DiskUtil) ListSnapshots(volume string) ([]snapshot.Snapshot, error) {
+type Snapshot struct {
+	Name    string    `json:"SnapshotName"`
+	UUID    string    `json:"SnapshotUUID"`
+	Created time.Time `json:"-"`
+}
+
+func (s Snapshot) String() string {
+	return fmt.Sprintf("%s (%s)", s.Name, s.UUID)
+}
+
+func (d DiskUtil) ListSnapshots(volume string) ([]Snapshot, error) {
 	cmd := exec.Command("diskutil", "apfs", "listsnapshots", "-plist", volume)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -71,10 +79,7 @@ func (d DiskUtil) ListSnapshots(volume string) ([]snapshot.Snapshot, error) {
 		return nil, fmt.Errorf("`%s` failed to start: %v", cmd, err)
 	}
 	var snapshotList struct {
-		Snapshots []struct{
-			Name string `json:"SnapshotName"`
-			UUID string `json:"SnapshotUUID"`
-		} `json:"Snapshots"`
+		Snapshots []Snapshot `json:"Snapshots"`
 	}
 	if err := decodePlist(stdout, &snapshotList); err != nil {
 		return nil, fmt.Errorf("error parsing plist: %v", err)
@@ -83,20 +88,8 @@ func (d DiskUtil) ListSnapshots(volume string) ([]snapshot.Snapshot, error) {
 		return nil, fmt.Errorf("`%s` failed (%v) with stderr: %s", cmd, err, stderr)
 	}
 
-	var snapshots []snapshot.Snapshot
-	for _, snap := range snapshotList.Snapshots {
-		created, err := parseTimeFromSnapshotName(snap.Name)
-		if err != nil {
-			return nil, err
-		}
-		snapshots = append(snapshots, snapshot.Snapshot{
-			Name:    snap.Name,
-			UUID:    snap.UUID,
-			Created: created,
-		})
-	}
-
 	// TODO: document why we sort here.
+	snapshots := snapshotList.Snapshots
 	isSorted := sort.SliceIsSorted(snapshots, func(i, ii int) bool {
 		lhs := snapshots[i]
 		rhs := snapshots[ii]
