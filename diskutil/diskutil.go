@@ -117,6 +117,19 @@ func parseTimeFromSnapshotName(name string) (time.Time, error) {
 	return created, nil
 }
 
+func (d DiskUtil) DeleteSnapshot(volume string, snap Snapshot) error {
+	cmd := exec.Command("diskutil", "apfs", "deletesnapshot", volume, "-uuid", snap.UUID)
+	cmd.Stdout = os.Stdout
+	stderr := new(bytes.Buffer)
+	cmd.Stderr = stderr
+
+	log.Printf("Running command:\n%s", cmd)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("`%s` failed (%v) with stderr: %s", cmd, err, stderr)
+	}
+	return nil
+}
+
 func decodePlist(r io.Reader, v interface{}) error {
 	cmd := exec.Command(
 		"plutil",

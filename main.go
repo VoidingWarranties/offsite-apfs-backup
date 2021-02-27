@@ -12,6 +12,7 @@ import (
 var (
 	source = flag.String("source", "", "source APFS volume to clone - may be a mount point, /dev/ path, or volume UUID")
 	targets targetsFlag
+	prune = flag.Bool("prune", false, "prune the latest snapshot that source and target had in common before the clone")
 )
 
 func init() {
@@ -37,7 +38,7 @@ func main() {
 
 	errs := make(map[string]error) // Map of target volume to clone error.
 	for _, target := range targets {
-		c := cloner.New()
+		c := cloner.New(cloner.Prune(*prune))
 		if err := c.Clone(*source, target); err != nil {
 			errs[target] = err
 			log.Printf("failed to clone %q to %q: %v", *source, target, err)
