@@ -35,11 +35,16 @@ func main() {
 		log.Fatal(err)
 	}
 
+	errs := make(map[string]error) // Map of target volume to clone error.
 	for _, target := range targets {
 		c := cloner.New()
 		if err := c.Clone(*source, target); err != nil {
-			log.Fatalf("failed to clone %q to %q: %v", *source, target, err)
+			errs[target] = err
+			log.Printf("failed to clone %q to %q: %v", *source, target, err)
 		}
+	}
+	if len(errs) > 0 {
+		log.Fatalf("failed to clone to %d/%d targets", len(errs), len(targets))
 	}
 }
 
