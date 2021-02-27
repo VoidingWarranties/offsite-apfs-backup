@@ -9,22 +9,37 @@ import (
 	"apfs-snapshot-diff-clone/diskutil"
 )
 
-func New() Cloner {
-	return Cloner {
+type Option func(*Cloner)
+
+func Prune(prune bool) Option {
+	return func(c *Cloner) {
+		c.prune = prune
+	}
+}
+
+func New(opts ...Option) Cloner {
+	c := Cloner {
 		diskutil: diskutil.DiskUtil{},
 		asr:      asr.ASR{},
 	}
+	for _, opt := range opts {
+		opt(&c)
+	}
+	return c
 }
 
 type Cloner struct {
 	diskutil du
 	asr      restorer
+
+	prune bool
 }
 
 type du interface {
 	Info(volume string) (diskutil.VolumeInfo, error)
 	Rename(volume string, name string) error
 	ListSnapshots(volume string) ([]diskutil.Snapshot, error)
+	DeleteSnapshot(volume string, snap diskutil.Snapshot) error
 }
 
 type restorer interface {
@@ -63,8 +78,17 @@ func (c Cloner) Clone(source, target string) error {
 	if err := c.asr.Restore(sourceInfo, targetInfo, latestSourceSnap, commonSnap); err != nil {
 		return fmt.Errorf("error restoring: %v", err)
 	}
+	if err := c.diskutil.Rename(targetInfo.UUID, targetInfo.Name); err != nil {
+		return fmt.Errorf("error renaming volume to original name: %v", err)
+	}
 
-	return c.diskutil.Rename(targetInfo.UUID, targetInfo.Name)
+	if c.prune {
+		log.Print("Pruning common snapshot from target...")
+		if err := c.diskutil.DeleteSnapshot(targetInfo.UUID, commonSnap); err != nil {
+			return fmt.Errorf("error deleting snapshot %q from target", commonSnap)
+		}
+	}
+	return nil
 }
 
 // TODO: document that this relies on the snapshots being in the right order.
