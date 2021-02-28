@@ -17,6 +17,18 @@ func Prune(prune bool) Option {
 	}
 }
 
+func WithDiskUtil(du du) Option {
+	return func(c *Cloner) {
+		c.diskutil = du
+	}
+}
+
+func WithASR(r restorer) Option {
+	return func(c *Cloner) {
+		c.asr = r
+	}
+}
+
 func New(opts ...Option) Cloner {
 	c := Cloner {
 		diskutil: diskutil.DiskUtil{},
