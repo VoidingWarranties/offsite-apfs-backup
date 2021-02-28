@@ -13,10 +13,12 @@ import (
 	"time"
 )
 
+var execCommand = exec.Command
+
 type DiskUtil struct {}
 
 func (d DiskUtil) Rename(volume string, name string) error {
-	cmd := exec.Command("diskutil", "rename", volume, name)
+	cmd := execCommand("diskutil", "rename", volume, name)
 	cmd.Stdout = os.Stdout
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
@@ -35,7 +37,7 @@ type VolumeInfo struct {
 }
 
 func (d DiskUtil) Info(volume string) (VolumeInfo, error) {
-	cmd := exec.Command("diskutil", "info", "-plist", volume)
+	cmd := execCommand("diskutil", "info", "-plist", volume)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return VolumeInfo{}, fmt.Errorf("error creating stdout pipe: %v", err)
@@ -67,7 +69,7 @@ func (s Snapshot) String() string {
 }
 
 func (d DiskUtil) ListSnapshots(volume string) ([]Snapshot, error) {
-	cmd := exec.Command("diskutil", "apfs", "listsnapshots", "-plist", volume)
+	cmd := execCommand("diskutil", "apfs", "listsnapshots", "-plist", volume)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, fmt.Errorf("error creating stdout pipe: %v", err)
@@ -118,7 +120,7 @@ func parseTimeFromSnapshotName(name string) (time.Time, error) {
 }
 
 func (d DiskUtil) DeleteSnapshot(volume string, snap Snapshot) error {
-	cmd := exec.Command("diskutil", "apfs", "deletesnapshot", volume, "-uuid", snap.UUID)
+	cmd := execCommand("diskutil", "apfs", "deletesnapshot", volume, "-uuid", snap.UUID)
 	cmd.Stdout = os.Stdout
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
@@ -131,11 +133,11 @@ func (d DiskUtil) DeleteSnapshot(volume string, snap Snapshot) error {
 }
 
 func decodePlist(r io.Reader, v interface{}) error {
-	cmd := exec.Command(
+	cmd := execCommand(
 		"plutil",
 		"-convert", "json",
 		// Read from stdin.
-		"-r", "-",
+		"-",
 		// Output to stdout.
 		"-o", "-")
 	stdout, err := cmd.StdoutPipe()
@@ -152,7 +154,7 @@ func decodePlist(r io.Reader, v interface{}) error {
 		return fmt.Errorf("failed to parse json: %v", err)
 	}
 	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("`%s` failed (%v) with stderr: %s", cmd, err, stderr)
+		return fmt.Errorf("`%s` failed (%w) with stderr: %s", cmd, err, stderr)
 	}
 	return nil
 }
