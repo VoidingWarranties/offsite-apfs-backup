@@ -38,24 +38,9 @@ type VolumeInfo struct {
 
 func (d DiskUtil) Info(volume string) (VolumeInfo, error) {
 	cmd := execCommand("diskutil", "info", "-plist", volume)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return VolumeInfo{}, fmt.Errorf("error creating stdout pipe: %v", err)
-	}
-	stderr := new(bytes.Buffer)
-	cmd.Stderr = stderr
-	log.Printf("Running command:\n%s", cmd)
-	if err := cmd.Start(); err != nil {
-		return VolumeInfo{}, fmt.Errorf("`%s` failed to start: %v", cmd, err)
-	}
 	var info VolumeInfo
-	if err := decodePlist(stdout, &info); err != nil {
-		return VolumeInfo{}, fmt.Errorf("error parsing plist: %v", err)
-	}
-	if err := cmd.Wait(); err != nil {
-		return VolumeInfo{}, fmt.Errorf("`%s` failed (%v) with stderr: %s", cmd, err, stderr)
-	}
-	return info, nil
+	err := runAndDecodePlist(cmd, &info)
+	return info, err
 }
 
 type Snapshot struct {
@@ -70,24 +55,12 @@ func (s Snapshot) String() string {
 
 func (d DiskUtil) ListSnapshots(volume string) ([]Snapshot, error) {
 	cmd := execCommand("diskutil", "apfs", "listsnapshots", "-plist", volume)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, fmt.Errorf("error creating stdout pipe: %v", err)
-	}
-	stderr := new(bytes.Buffer)
-	cmd.Stderr = stderr
-	log.Printf("Running command:\n%s", cmd)
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("`%s` failed to start: %v", cmd, err)
-	}
 	var snapshotList struct {
 		Snapshots []Snapshot `json:"Snapshots"`
 	}
-	if err := decodePlist(stdout, &snapshotList); err != nil {
-		return nil, fmt.Errorf("error parsing plist: %v", err)
-	}
-	if err := cmd.Wait(); err != nil {
-		return nil, fmt.Errorf("`%s` failed (%v) with stderr: %s", cmd, err, stderr)
+	err := runAndDecodePlist(cmd, &snapshotList)
+	if err != nil {
+		return nil, err
 	}
 
 	// TODO: document why we sort here.
@@ -132,6 +105,48 @@ func (d DiskUtil) DeleteSnapshot(volume string, snap Snapshot) error {
 	return nil
 }
 
+func runAndDecodePlist(cmd *exec.Cmd, v interface{}) error {
+	log.Printf("Running command:\n%s", cmd)
+	stdout, err := cmd.Output()
+	r := bytes.NewReader(stdout)
+	if err != nil {
+		var errMsg plistErrorMessage
+		if perr := decodePlist(r, &errMsg); perr == nil && errMsg.IsError {
+			plistErr := plistError{
+				message: errMsg.Message,
+				cmdErr:  err,
+			}
+			return fmt.Errorf("`%s` failed %w", cmd, plistErr)
+		}
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return fmt.Errorf("`%s` failed (%w) with stderr: %s", cmd, err, exitErr.Stderr)
+		}
+		return fmt.Errorf("`%s` failed (%w)", cmd, err)
+	}
+	if err := decodePlist(r, v); err != nil {
+		return fmt.Errorf("error parsing plist: %w", err)
+	}
+	return nil
+}
+
+type plistError struct {
+	message string
+	cmdErr  error
+}
+
+func (err plistError) Error() string {
+	return fmt.Sprintf("(%s) with error: %s", err.cmdErr, err.message)
+}
+
+func (err plistError) Unwrap() error {
+	return err.cmdErr
+}
+
+type plistErrorMessage struct {
+	IsError bool   `json:"Error"`
+	Message string `json:"ErrorMessage"`
+}
+
 func decodePlist(r io.Reader, v interface{}) error {
 	cmd := execCommand(
 		"plutil",
@@ -140,21 +155,16 @@ func decodePlist(r io.Reader, v interface{}) error {
 		"-",
 		// Output to stdout.
 		"-o", "-")
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return fmt.Errorf("error creating stdout pipe: %v", err)
-	}
 	cmd.Stdin = r
-	stderr := new(bytes.Buffer)
-	cmd.Stderr = stderr
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("`%s` failed to start: %v", cmd, err)
+	stdout, err := cmd.Output()
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		return fmt.Errorf("`%s` failed (%w) with stderr: %s", cmd, err, exitErr.Stderr)
 	}
-	if err := json.NewDecoder(stdout).Decode(v); err != nil {
+	if err != nil {
+		return fmt.Errorf("`%s` failed (%w)", cmd, err)
+	}
+	if err := json.Unmarshal(stdout, v); err != nil {
 		return fmt.Errorf("failed to parse json: %w", err)
-	}
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("`%s` failed (%w) with stderr: %s", cmd, err, stderr)
 	}
 	return nil
 }

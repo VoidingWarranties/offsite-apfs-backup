@@ -206,3 +206,148 @@ func TestDecodePlist_Errors(t *testing.T) {
 		})
 	}
 }
+
+func TestInfo(t *testing.T) {
+	t.Cleanup(func() { execCommand = exec.Command })
+
+	tests := []struct{
+		name       string
+		stdouts    map[string]string
+		stderrs    map[string]string
+		wantStdins map[string]string
+		want       VolumeInfo
+	}{
+		{
+			name: "success",
+			stdouts: map[string]string{
+				"diskutil": "<plist diskutil output>",
+				"plutil": `{
+					"VolumeUUID": "foo-uuid",
+					"VolumeName": "foo-name",
+					"MountPoint": "/foo/mount/point"
+				}`,
+			},
+			wantStdins: map[string]string{
+				"plutil": "<plist diskutil output>",
+			},
+			want: VolumeInfo{
+				UUID:       "foo-uuid",
+				Name:       "foo-name",
+				MountPoint: "/foo/mount/point",
+			},
+		},
+		{
+			name: "ignores stderr (if exit code 0)",
+			stdouts: map[string]string{
+				"diskutil": "<plist diskutil output>",
+				"plutil": `{
+					"VolumeUUID": "bar-uuid",
+					"VolumeName": "bar-name",
+					"MountPoint": "/bar/mount/point"
+				}`,
+			},
+			stderrs: map[string]string{
+				"diskutil": "diskutil-stderr",
+				"plutil": "plutil-stderr",
+			},
+			wantStdins: map[string]string{
+				"plutil": "<plist diskutil output>",
+			},
+			want: VolumeInfo{
+				UUID:       "bar-uuid",
+				Name:       "bar-name",
+				MountPoint: "/bar/mount/point",
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			execCommand = fakeCommand(test.stdouts, test.stderrs, test.wantStdins, nil)
+
+			du := DiskUtil{}
+			got, err := du.Info("/example/volume")
+			if err := asHelperProcessErr(err); err != nil {
+				t.Fatal(err)
+			}
+			if err != nil {
+				t.Fatalf("Info returned unexpected error: %q, want: nil", err)
+			}
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Errorf("Info returned unexpected VolumeInfo. -want +got:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestInfo_Errors(t *testing.T) {
+	t.Cleanup(func() { execCommand = exec.Command })
+
+	var exitErr *exec.ExitError
+	var plistErr plistError
+
+	tests := []struct{
+		name       string
+		stdouts    map[string]string
+		stderrs    map[string]string
+		wantStdins map[string]string
+		exitFails  map[string]bool
+		wantErrAs interface{}
+	}{
+		{
+			name: "diskutil exec errors",
+			stdouts: map[string]string{
+				"diskutil": "foo-stdout",
+				"plutil":   "{}",
+			},
+			stderrs:    map[string]string{"diskutil": "stderr"},
+			wantStdins: map[string]string{"plutil": "foo-stdout"},
+			exitFails:  map[string]bool{"diskutil": true},
+			wantErrAs:  &exitErr,
+		},
+		{
+			name: "plutil exec errors",
+			stdouts: map[string]string{
+				"diskutil": "foo-stdout",
+				"plutil":   "{}",
+			},
+			stderrs:    map[string]string{"plutil": "stderr"},
+			wantStdins: map[string]string{"plutil": "foo-stdout"},
+			exitFails:  map[string]bool{"plutil": true},
+			wantErrAs:  &exitErr,
+		},
+		{
+			name: "diskutil plist error output - returns plist error",
+			stdouts: map[string]string{
+				"diskutil": "diskutil-plist-err",
+				"plutil":   `{"Error": true, "ErrorMessage": "diskutil err message"}`,
+			},
+			wantStdins: map[string]string{"plutil": "diskutil-plist-err"},
+			exitFails:  map[string]bool{"diskutil": true},
+			wantErrAs:  &plistErr,
+		},
+		{
+			name: "diskutil plist error output - plist error wraps exec.ExitError",
+			stdouts: map[string]string{
+				"diskutil": "diskutil-plist-err",
+				"plutil":   `{"Error": true, "ErrorMessage": "diskutil err message"}`,
+			},
+			wantStdins: map[string]string{"plutil": "diskutil-plist-err"},
+			exitFails:  map[string]bool{"diskutil": true},
+			wantErrAs:  &exitErr,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			execCommand = fakeCommand(test.stdouts, test.stderrs, test.wantStdins, test.exitFails)
+
+			du := DiskUtil{}
+			_, err := du.Info("/example/volume")
+			if err := asHelperProcessErr(err); err != nil {
+				t.Fatal(err)
+			}
+			if !errors.As(err, test.wantErrAs) {
+				t.Errorf("Info returned unexpected error: %v, want type: %v", err, reflect.TypeOf(test.wantErrAs).Elem())
+			}
+		})
+	}
+}
