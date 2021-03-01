@@ -151,7 +151,7 @@ func decodePlist(r io.Reader, v interface{}) error {
 		return fmt.Errorf("`%s` failed to start: %v", cmd, err)
 	}
 	if err := json.NewDecoder(stdout).Decode(v); err != nil {
-		return fmt.Errorf("failed to parse json: %v", err)
+		return fmt.Errorf("failed to parse json: %w", err)
 	}
 	if err := cmd.Wait(); err != nil {
 		return fmt.Errorf("`%s` failed (%w) with stderr: %s", cmd, err, stderr)

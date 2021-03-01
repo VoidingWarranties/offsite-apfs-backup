@@ -2,12 +2,13 @@ package diskutil
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
-	"strings"
+	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -73,16 +74,23 @@ func TestHelperProcess(*testing.T) {
 	fmt.Fprint(os.Stderr, os.Getenv("GO_HELPER_PROCESS_STDERR"))
 }
 
-// isHelperProcessErr returns true if any error in err's chain is an
+// asHelperProcessErr returns a non-nil error if any error in err's chain is an
 // *os.ExitError with exit code equal to the magic number 42. Use it to
 // determine if a (potentially wrapped) error from running a exec.Cmd was
 // caused by an unintended error in the TestHelperProcess func.
-func isHelperProcessErr(err error) bool {
+//
+// If err represents a helper process error and *os.ExitError.Stderr is not
+// empty, an error containing just the stderr is returned. Otherwise, the
+// original error is returned.
+func asHelperProcessErr(err error) error {
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) && exitErr.ExitCode() == helperProcessErrExitCode {
-		return true
+		if len(exitErr.Stderr) != 0 {
+			return errors.New(string(exitErr.Stderr))
+		}
+		return err
 	}
-	return false
+	return nil
 }
 
 func TestDecodePlist(t *testing.T) {
@@ -137,7 +145,7 @@ func TestDecodePlist(t *testing.T) {
 
 			got := simpleStruct{}
 			err := decodePlist(test.r, &got)
-			if isHelperProcessErr(err) {
+			if err := asHelperProcessErr(err); err != nil {
 				// TODO: it would be nice if we could `t.Fatal(string(exitErr.Stderr))` instead, but exec.Cmd.Wait() does not populate this field. I don't see why it couldn't. Add it!
 				t.Fatal(err)
 			}
@@ -158,25 +166,27 @@ func TestDecodePlist_Errors(t *testing.T) {
 		Val string `json:"val"`
 	}
 
+	var exitErr *exec.ExitError
+	var syntaxErr *json.SyntaxError
+
 	tests := []struct{
-		name     string
-		stdout   string
-		stderr   string
-		exitFail bool
+		name      string
+		stdout    string
+		stderr    string
+		exitFail  bool
+		wantErrAs interface{}
 	}{
 		{
-			name:       "non-0 exit code",
-			stdout:     "{}",
-			stderr:     "example stderr foobar",
-			exitFail:   true,
+			name:      "non-0 exit code",
+			stdout:    "{}",
+			stderr:    "example stderr foobar",
+			exitFail:  true,
+			wantErrAs: &exitErr,
 		},
 		{
-			name:   "empty stdout returns JSON decode error",
-			stdout: "",
-		},
-		{
-			name:   "invalid JSON returns decode error",
-			stdout: "not-json",
+			name:      "invalid JSON returns decode error",
+			stdout:    "not-json",
+			wantErrAs: &syntaxErr,
 		},
 	}
 	for _, test := range tests {
@@ -187,14 +197,11 @@ func TestDecodePlist_Errors(t *testing.T) {
 			execCommand = fakeCommand(stdouts, stderrs, nil, exitFails)
 
 			err := decodePlist(nil, &simpleStruct{})
-			if err == nil {
-				t.Fatal("decodePlist returned nil error, want non-nil")
-			}
-			if isHelperProcessErr(err) {
+			if err := asHelperProcessErr(err); err != nil {
 				t.Fatal(err)
 			}
-			if !strings.Contains(err.Error(), test.stderr) {
-				t.Errorf("decodePlist returned error (%q) that does not contain stderr (%q)", err, test.stderr)
+			if !errors.As(err, test.wantErrAs) {
+				t.Errorf("decodePlist returned unexpected error: %v, want type: %v", err, reflect.TypeOf(test.wantErrAs).Elem())
 			}
 		})
 	}
