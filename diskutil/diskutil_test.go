@@ -16,18 +16,25 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
-func fakeCommand(stdouts, stderrs, wantStdins map[string]string, exitFails map[string]bool) func(string, ...string) *exec.Cmd {
+type fakeCommandOptions struct {
+	stdouts    map[string]string
+	stderrs    map[string]string
+	wantStdins map[string]string
+	exitFails  map[string]bool
+}
+
+func fakeCommand(opt fakeCommandOptions) func(string, ...string) *exec.Cmd {
 	return func(name string, args ...string) *exec.Cmd {
 		cmd := exec.Command(os.Args[0], "-test.run=TestHelperProcess")
 		cmd.Env = append(os.Environ(),
 			"GO_WANT_HELPER_PROCESS=1",
-			fmt.Sprintf("GO_HELPER_PROCESS_STDOUT=%s", stdouts[name]),
-			fmt.Sprintf("GO_HELPER_PROCESS_STDERR=%s", stderrs[name]),
+			fmt.Sprintf("GO_HELPER_PROCESS_STDOUT=%s", opt.stdouts[name]),
+			fmt.Sprintf("GO_HELPER_PROCESS_STDERR=%s", opt.stderrs[name]),
 		)
-		if exitFail := exitFails[name]; exitFail {
+		if exitFail := opt.exitFails[name]; exitFail {
 			cmd.Env = append(cmd.Env, "GO_HELPER_PROCESS_EXIT_FAIL=1")
 		}
-		if wantStdin, exists := wantStdins[name]; exists {
+		if wantStdin, exists := opt.wantStdins[name]; exists {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("GO_HELPER_PROCESS_WANT_STDIN=%s", wantStdin))
 		}
 		return cmd
@@ -140,10 +147,12 @@ func TestDecodePlist(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			stdouts := map[string]string{"plutil": test.stdout}
-			stderrs := map[string]string{"plutil": test.stderr}
-			wantStdins := map[string]string{"plutil": test.wantStdin}
-			execCommand = fakeCommand(stdouts, stderrs, wantStdins, nil)
+			fakeCmdOpts := fakeCommandOptions{
+				stdouts:    map[string]string{"plutil": test.stdout},
+				stderrs:    map[string]string{"plutil": test.stderr},
+				wantStdins: map[string]string{"plutil": test.wantStdin},
+			}
+			execCommand = fakeCommand(fakeCmdOpts)
 
 			got := simpleStruct{}
 			err := decodePlist(test.r, &got)
@@ -193,10 +202,12 @@ func TestDecodePlist_Errors(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			stdouts := map[string]string{"plutil": test.stdout}
-			stderrs := map[string]string{"plutil": test.stderr}
-			exitFails := map[string]bool{"plutil": test.exitFail}
-			execCommand = fakeCommand(stdouts, stderrs, nil, exitFails)
+			fakeCmdOpts := fakeCommandOptions{
+				stdouts:   map[string]string{"plutil": test.stdout},
+				stderrs:   map[string]string{"plutil": test.stderr},
+				exitFails: map[string]bool{"plutil": test.exitFail},
+			}
+			execCommand = fakeCommand(fakeCmdOpts)
 
 			err := decodePlist(nil, &simpleStruct{})
 			if err := asHelperProcessErr(err); err != nil {
@@ -264,7 +275,12 @@ func TestInfo(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			execCommand = fakeCommand(test.stdouts, test.stderrs, test.wantStdins, nil)
+			fakeCmdOpts := fakeCommandOptions{
+				stdouts:    test.stdouts,
+				stderrs:    test.stderrs,
+				wantStdins: test.wantStdins,
+			}
+			execCommand = fakeCommand(fakeCmdOpts)
 
 			du := DiskUtil{}
 			got, err := du.Info("/example/volume")
@@ -340,7 +356,13 @@ func TestInfo_Errors(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			execCommand = fakeCommand(test.stdouts, test.stderrs, test.wantStdins, test.exitFails)
+			fakeCmdOpts := fakeCommandOptions{
+				stdouts:    test.stdouts,
+				stderrs:    test.stderrs,
+				wantStdins: test.wantStdins,
+				exitFails:  test.exitFails,
+			}
+			execCommand = fakeCommand(fakeCmdOpts)
 
 			du := DiskUtil{}
 			_, err := du.Info("/example/volume")
@@ -422,7 +444,12 @@ func TestListSnapshots(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			execCommand = fakeCommand(test.stdouts, test.stderrs, test.wantStdins, nil)
+			fakeCmdOpts := fakeCommandOptions{
+				stdouts:    test.stdouts,
+				stderrs:    test.stderrs,
+				wantStdins: test.wantStdins,
+			}
+			execCommand = fakeCommand(fakeCmdOpts)
 
 			du := DiskUtil{}
 			got, err := du.ListSnapshots("/example/volume")
@@ -533,7 +560,13 @@ func TestListSnapshots_Errors(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			execCommand = fakeCommand(test.stdouts, test.stderrs, test.wantStdins, test.exitFails)
+			fakeCmdOpts := fakeCommandOptions{
+				stdouts:    test.stdouts,
+				stderrs:    test.stderrs,
+				wantStdins: test.wantStdins,
+				exitFails:  test.exitFails,
+			}
+			execCommand = fakeCommand(fakeCmdOpts)
 
 			du := DiskUtil{}
 			_, err := du.ListSnapshots("/example/volume")
@@ -549,7 +582,7 @@ func TestListSnapshots_Errors(t *testing.T) {
 
 func TestRename(t *testing.T) {
 	t.Cleanup(func() { execCommand = exec.Command })
-	execCommand = fakeCommand(nil, nil, nil, nil)
+	execCommand = fakeCommand(fakeCommandOptions{})
 
 	du := DiskUtil{}
 	err := du.Rename("/example/volume", "newname")
@@ -563,9 +596,11 @@ func TestRename(t *testing.T) {
 
 func TestRename_Errors(t *testing.T) {
 	t.Cleanup(func() { execCommand = exec.Command })
-	stderrs := map[string]string{"diskutil": "example stderr"}
-	exitFails := map[string]bool{"diskutil": true}
-	execCommand = fakeCommand(nil, stderrs, nil, exitFails)
+	fakeCmdOpts := fakeCommandOptions{
+		stderrs:   map[string]string{"diskutil": "example stderr"},
+		exitFails: map[string]bool{"diskutil": true},
+	}
+	execCommand = fakeCommand(fakeCmdOpts)
 
 	du := DiskUtil{}
 	err := du.Rename("/example/volume", "newname")
@@ -580,7 +615,7 @@ func TestRename_Errors(t *testing.T) {
 
 func TestDeleteSnapshot(t *testing.T) {
 	t.Cleanup(func() { execCommand = exec.Command })
-	execCommand = fakeCommand(nil, nil, nil, nil)
+	execCommand = fakeCommand(fakeCommandOptions{})
 
 	du := DiskUtil{}
 	err := du.DeleteSnapshot("/example/volume", Snapshot{
@@ -597,9 +632,11 @@ func TestDeleteSnapshot(t *testing.T) {
 
 func TestDeleteSnapshot_Errors(t *testing.T) {
 	t.Cleanup(func() { execCommand = exec.Command })
-	stderrs := map[string]string{"diskutil": "example stderr"}
-	exitFails := map[string]bool{"diskutil": true}
-	execCommand = fakeCommand(nil, stderrs, nil, exitFails)
+	fakeCmdOpts := fakeCommandOptions{
+		stderrs:   map[string]string{"diskutil": "example stderr"},
+		exitFails: map[string]bool{"diskutil": true},
+	}
+	execCommand = fakeCommand(fakeCmdOpts)
 
 	du := DiskUtil{}
 	err := du.DeleteSnapshot("/example/volume", Snapshot{
