@@ -25,7 +25,7 @@ func (d DiskUtil) Rename(volume string, name string) error {
 
 	log.Printf("Running command:\n%s", cmd)
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("`%s` failed (%v) with stderr: %s", cmd, err, stderr)
+		return fmt.Errorf("`%s` failed (%w) with stderr: %s", cmd, err, stderr)
 	}
 	return nil
 }
@@ -118,7 +118,7 @@ func (d DiskUtil) DeleteSnapshot(volume string, snap Snapshot) error {
 
 	log.Printf("Running command:\n%s", cmd)
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("`%s` failed (%v) with stderr: %s", cmd, err, stderr)
+		return fmt.Errorf("`%s` failed (%w) with stderr: %s", cmd, err, stderr)
 	}
 	return nil
 }

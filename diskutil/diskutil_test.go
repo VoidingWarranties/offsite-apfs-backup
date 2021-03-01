@@ -546,3 +546,71 @@ func TestListSnapshots_Errors(t *testing.T) {
 		})
 	}
 }
+
+func TestRename(t *testing.T) {
+	t.Cleanup(func() { execCommand = exec.Command })
+	execCommand = fakeCommand(nil, nil, nil, nil)
+
+	du := DiskUtil{}
+	err := du.Rename("/example/volume", "newname")
+	if err := asHelperProcessErr(err); err != nil {
+		t.Fatal(err)
+	}
+	if err != nil {
+		t.Fatalf("Rename returned unexpected error: %v, want: nil", err)
+	}
+}
+
+func TestRename_Errors(t *testing.T) {
+	t.Cleanup(func() { execCommand = exec.Command })
+	stderrs := map[string]string{"diskutil": "example stderr"}
+	exitFails := map[string]bool{"diskutil": true}
+	execCommand = fakeCommand(nil, stderrs, nil, exitFails)
+
+	du := DiskUtil{}
+	err := du.Rename("/example/volume", "newname")
+	if err := asHelperProcessErr(err); err != nil {
+		t.Fatal(err)
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Errorf("Rename returned unexpected error: %v, want type: *exec.ExitError", err)
+	}
+}
+
+func TestDeleteSnapshot(t *testing.T) {
+	t.Cleanup(func() { execCommand = exec.Command })
+	execCommand = fakeCommand(nil, nil, nil, nil)
+
+	du := DiskUtil{}
+	err := du.DeleteSnapshot("/example/volume", Snapshot{
+		Name: "example-snapshot",
+		UUID: "example-snapshot-uuid",
+	})
+	if err := asHelperProcessErr(err); err != nil {
+		t.Fatal(err)
+	}
+	if err != nil {
+		t.Fatalf("DeleteSnapshot returned unexpected error: %v, want: nil", err)
+	}
+}
+
+func TestDeleteSnapshot_Errors(t *testing.T) {
+	t.Cleanup(func() { execCommand = exec.Command })
+	stderrs := map[string]string{"diskutil": "example stderr"}
+	exitFails := map[string]bool{"diskutil": true}
+	execCommand = fakeCommand(nil, stderrs, nil, exitFails)
+
+	du := DiskUtil{}
+	err := du.DeleteSnapshot("/example/volume", Snapshot{
+		Name: "example-snapshot",
+		UUID: "example-snapshot-uuid",
+	})
+	if err := asHelperProcessErr(err); err != nil {
+		t.Fatal(err)
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Errorf("DeleteSnapshot returned unexpected error: %v, want type: *exec.ExitError", err)
+	}
+}
