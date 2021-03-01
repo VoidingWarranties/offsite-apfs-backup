@@ -64,14 +64,24 @@ func (d DiskUtil) ListSnapshots(volume string) ([]Snapshot, error) {
 	}
 
 	// TODO: document why we sort here.
-	snapshots := snapshotList.Snapshots
+	var snapshots []Snapshot
+	for _, snap := range snapshotList.Snapshots {
+		created, err := parseTimeFromSnapshotName(snap.Name)
+		if err != nil {
+			return nil, err
+		}
+		snap.Created = created
+		snapshots = append(snapshots, snap)
+	}
 	isSorted := sort.SliceIsSorted(snapshots, func(i, ii int) bool {
 		lhs := snapshots[i]
 		rhs := snapshots[ii]
 		return lhs.Created.Before(rhs.Created)
 	})
 	if !isSorted {
-		return nil, fmt.Errorf("`%s` returned snapshots in an unexpected order", cmd)
+		return nil, validationError{
+			fmt.Errorf("`%s` returned snapshots in an unexpected order", cmd),
+		}
 	}
 	for i, ii := 0, len(snapshots)-1; i < ii; i, ii = i+1, ii-1 {
 		snapshots[i], snapshots[ii] = snapshots[ii], snapshots[i]
@@ -79,15 +89,23 @@ func (d DiskUtil) ListSnapshots(volume string) ([]Snapshot, error) {
 	return snapshots, nil
 }
 
+type validationError struct {
+	error
+}
+
 func parseTimeFromSnapshotName(name string) (time.Time, error) {
 	timeRegex := regexp.MustCompile(`\d{4}-\d{2}-\d{2}-\d{6}`)
 	timeMatch := timeRegex.FindString(name)
 	if len(timeMatch) == 0 {
-		return time.Time{}, fmt.Errorf("snapshot name (%q) does not contain a timestamp of the form yyyy-mm-dd-hhmmss", name)
+		return time.Time{}, validationError{
+			fmt.Errorf("snapshot name (%q) does not contain a timestamp of the form yyyy-mm-dd-hhmmss", name),
+		}
 	}
 	created, err := time.Parse("2006-01-02-150405", string(timeMatch))
 	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to parse time substring (%q) from snapshot name", timeMatch)
+		return time.Time{}, validationError{
+			fmt.Errorf("failed to parse time substring (%q) from snapshot name", timeMatch),
+		}
 	}
 	return created, nil
 }
