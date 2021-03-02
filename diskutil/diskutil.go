@@ -34,6 +34,7 @@ type VolumeInfo struct {
 	UUID       string `json:"VolumeUUID"`
 	Name       string `json:"VolumeName"`
 	MountPoint string `json:"MountPoint"`
+	Device     string `json:"DeviceNode"`
 }
 
 func (d DiskUtil) Info(volume string) (VolumeInfo, error) {

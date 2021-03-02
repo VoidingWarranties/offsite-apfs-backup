@@ -10,6 +10,7 @@ import (
 	"apfs-snapshot-diff-clone/testutil"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 var (
@@ -27,7 +28,11 @@ func TestInfo(t *testing.T) {
 	}
 	want := imgInfo
 	want.MountPoint = mountpoint
-	if diff := cmp.Diff(want, got); diff != "" {
+	// TODO: don't ignore Device.
+	cmpOpts := []cmp.Option{
+		cmpopts.IgnoreFields(diskutil.VolumeInfo{}, "Device"),
+	}
+	if diff := cmp.Diff(want, got, cmpOpts...); diff != "" {
 		t.Errorf("Info returned unexpected volume info. -want +got:\n%s", diff)
 	}
 }
@@ -74,7 +79,11 @@ func TestRename(t *testing.T) {
 	want := imgInfo
 	want.Name = "newname"
 	want.MountPoint = mountpoint
-	if diff := cmp.Diff(want, got); diff != "" {
+	// TODO: don't ignore Device.
+	cmpOpts := []cmp.Option{
+		cmpopts.IgnoreFields(diskutil.VolumeInfo{}, "Device"),
+	}
+	if diff := cmp.Diff(want, got, cmpOpts...); diff != "" {
 		t.Errorf("Rename resulted in unexpected results. -want +got:\n%s", diff)
 	}
 }

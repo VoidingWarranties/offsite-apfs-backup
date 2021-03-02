@@ -237,7 +237,8 @@ func TestInfo(t *testing.T) {
 				"plutil": `{
 					"VolumeUUID": "foo-uuid",
 					"VolumeName": "foo-name",
-					"MountPoint": "/foo/mount/point"
+					"MountPoint": "/foo/mount/point",
+					"DeviceNode": "/dev/disk1s2"
 				}`,
 			},
 			wantStdins: map[string]string{
@@ -247,6 +248,7 @@ func TestInfo(t *testing.T) {
 				UUID:       "foo-uuid",
 				Name:       "foo-name",
 				MountPoint: "/foo/mount/point",
+				Device:     "/dev/disk1s2",
 			},
 		},
 		{
@@ -256,7 +258,8 @@ func TestInfo(t *testing.T) {
 				"plutil": `{
 					"VolumeUUID": "bar-uuid",
 					"VolumeName": "bar-name",
-					"MountPoint": "/bar/mount/point"
+					"MountPoint": "/bar/mount/point",
+					"DeviceNode": "/dev/disk3s4"
 				}`,
 			},
 			stderrs: map[string]string{
@@ -270,6 +273,7 @@ func TestInfo(t *testing.T) {
 				UUID:       "bar-uuid",
 				Name:       "bar-name",
 				MountPoint: "/bar/mount/point",
+				Device:     "/dev/disk3s4",
 			},
 		},
 	}
