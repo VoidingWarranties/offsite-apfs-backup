@@ -33,12 +33,10 @@ func WithPLUtil(pl plutil.PLUtil) Option {
 }
 
 func New(opts ...Option) DiskUtil {
-	du := DiskUtil{}
-	defaultOpts := []Option{
-		WithExecCommand(exec.Command),
-		WithPLUtil(plutil.New(plutil.WithExecCommand(exec.Command))),
+	du := DiskUtil{
+		execCommand: exec.Command,
+		pl:          plutil.New(),
 	}
-	opts = append(defaultOpts, opts...)
 	for _, opt := range opts {
 		opt(&du)
 	}

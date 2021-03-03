@@ -24,11 +24,9 @@ func WithExecCommand(f func(string, ...string) *exec.Cmd) Option {
 }
 
 func New(opts ...Option) PLUtil {
-	pl := PLUtil{}
-	defaultOpts := []Option{
-		WithExecCommand(exec.Command),
+	pl := PLUtil{
+		execCommand: exec.Command,
 	}
-	opts = append(defaultOpts, opts...)
 	for _, opt := range opts {
 		opt(&pl)
 	}
