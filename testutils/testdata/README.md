@@ -1,13 +1,19 @@
-1. `hdiutil create -size 31g -fs apfs -volname source original_source.dmg`
-2. `hdiutil attach original_source.dmg`
-3. `echo foo > /Volumes/source/foo.txt`
-4. Take snapshot using Carbon Copy Cloner.
-5. `echo bar > /Volumes/source/bar.txt`
-6. Take snapshot using Carbon Copy Cloner.
-7. `hdiutil create -size 10m -fs apfs -volname source source.dmg`
-8. `hdiutil attach source.dmg`
-9. `apfs restore --source /Volumes/source --target /Volumes/source\ 1 --toSnapshot <snap-1-uuid> --erase`
-10. `apfs restore --source /Volumes/source --target /Volumes/source\ 1 --fromSnapshot <snap-1-uuid> --toSnapshot <snap-2-uuid> --erase`
-11. `hdiutil detach /Volumes/source\ 1`
-11. `hdiutil resize -size 8192b source.dmg`
-12. `hdiutil convert -format UDRO -o source.dmg -ov source.dmg`
+How to create disk images for tests:
+
+1. `hdiutil create -size 10m -fs apfs -volname name name.dmg && hdiutil attach name.dmg`
+2. Write data to image, either by copying data and taking a snapshot, or by
+   restoring image to another image's snapshots using:
+   `asr restore --source /Volumes/source --target /Volumes/name --toSnapshot <snap-1-uuid> --erase`
+3. `hdiutil detach /Volumes/name`
+4. `hdiutil convert name.dmg -format ULMO -o name.dmg -ov`
+
+Notes:
+
+- Smallest possible APFS volume is 1.1 MB, but taking a snapshot requires the
+  volume be at least 4.2 MB in size.
+- Using `asr restore` seems to require a target volume size > 4.2 MB (I chose
+  10 MB).
+- If using a third party backup utility to create APFS snapshots (e.g. Carbon
+  Copy Cloner), the initial size of the image may need to be much larger. For
+  example, Carbon Copy Cloner will delete old snapshots if the free space is
+  less than 30 GB. Images can be resized afterwards using `hdiutil resize`.
