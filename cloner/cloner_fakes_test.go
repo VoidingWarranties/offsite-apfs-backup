@@ -1,4 +1,4 @@
-package cloner_test
+package cloner
 
 import (
 	"errors"

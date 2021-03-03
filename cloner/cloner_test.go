@@ -1,4 +1,4 @@
-package cloner_test
+package cloner
 
 import (
 	"testing"
@@ -7,7 +7,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"apfs-snapshot-diff-clone/cloner"
 	"apfs-snapshot-diff-clone/diskutil"
 )
 
@@ -26,7 +25,7 @@ func TestClone(t *testing.T) {
 	tests := []struct{
 		name   string
 		setup  func(*testing.T, *fakeDevices)
-		opts   []cloner.Option
+		opts   []Option
 		source string
 		target string
 
@@ -94,7 +93,7 @@ func TestClone(t *testing.T) {
 					t.Fatalf("error adding volume: %v", err)
 				}
 			},
-			opts: []cloner.Option{cloner.Prune(true)},
+			opts: []Option{Prune(true)},
 			source: "/foo/mount/point",
 			target: "/bar/mount/point",
 			wantSourceSnaps: []diskutil.Snapshot{
@@ -114,11 +113,11 @@ func TestClone(t *testing.T) {
 			}
 			du := &fakeDiskUtil{&d}
 			test.setup(t, &d)
-			opts := append([]cloner.Option{
-				cloner.WithDiskUtil(du),
-				cloner.WithASR(&fakeASR{&d}),
+			opts := append([]Option{
+				WithDiskUtil(du),
+				WithASR(&fakeASR{&d}),
 			}, test.opts...)
-			c := cloner.New(opts...)
+			c := New(opts...)
 			if err := c.Clone(test.source, test.target); err != nil {
 				t.Fatalf("Clone(...) returned unexpected error: %q, want: nil", err)
 			}
@@ -310,15 +309,15 @@ func TestClone_Errors(t *testing.T) {
 				snapshots: make(map[string][]diskutil.Snapshot),
 			}
 			test.setup(t, &d)
-			opts := []cloner.Option{
+			opts := []Option{
 				// readonly so that test panics if any modifying methods are called.
-				cloner.WithDiskUtil(&readonlyFakeDiskUtil{
+				WithDiskUtil(&readonlyFakeDiskUtil{
 					du: &fakeDiskUtil{&d},
 				}),
 				// nil so that test panics if asr is called.
-				cloner.WithASR(nil),
+				WithASR(nil),
 			}
-			c := cloner.New(opts...)
+			c := New(opts...)
 			if err := c.Clone(test.source, test.target); err == nil {
 				t.Fatal("Clone(...) returned unexpected error: nil, want: non-nil")
 			}

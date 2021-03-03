@@ -31,7 +31,7 @@ func WithASR(r restorer) Option {
 
 func New(opts ...Option) Cloner {
 	c := Cloner {
-		diskutil: diskutil.DiskUtil{},
+		diskutil: diskutil.New(),
 		asr:      asr.ASR{},
 	}
 	for _, opt := range opts {
@@ -112,6 +112,7 @@ func latestCommonSnapshot(source, target []diskutil.Snapshot) (diskutil.Snapshot
 	if commonSourceI == 0 && commonTargetI == 0 {
 		return diskutil.Snapshot{}, errors.New("both source and target have the same latest snapshot")
 	}
+	// TODO: is this logic correct? Shouldn't it be `commonSourceI < commonTargetI`?
 	if commonSourceI == 0 {
 		return diskutil.Snapshot{}, errors.New("target has a snapshot ahead of source")
 	}
