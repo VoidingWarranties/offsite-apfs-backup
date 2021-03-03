@@ -18,8 +18,8 @@ func TestHelperProcess(t *testing.T) {
 	fakecmd.HelperProcess(t)
 }
 
-func newWithFakeCmd(opts fakecmd.Options) DiskUtil {
-	execCmd := fakecmd.FakeCommand(opts)
+func newWithFakeCmd(t *testing.T, opts fakecmd.Options) DiskUtil {
+	execCmd := fakecmd.FakeCommand(t, opts)
 	pl := plutil.New(plutil.WithExecCommand(execCmd))
 	return New(
 		WithExecCommand(execCmd),
@@ -89,7 +89,7 @@ func TestInfo(t *testing.T) {
 				Stderrs:    test.stderrs,
 				WantStdins: test.wantStdins,
 			}
-			du := newWithFakeCmd(fakeCmdOpts)
+			du := newWithFakeCmd(t, fakeCmdOpts)
 			got, err := du.Info("/example/volume")
 			if err := fakecmd.AsHelperProcessErr(err); err != nil {
 				t.Fatal(err)
@@ -167,7 +167,7 @@ func TestInfo_Errors(t *testing.T) {
 				WantStdins: test.wantStdins,
 				ExitFails:  test.exitFails,
 			}
-			du := newWithFakeCmd(fakeCmdOpts)
+			du := newWithFakeCmd(t, fakeCmdOpts)
 			_, err := du.Info("/example/volume")
 			if err := fakecmd.AsHelperProcessErr(err); err != nil {
 				t.Fatal(err)
@@ -250,7 +250,7 @@ func TestListSnapshots(t *testing.T) {
 				Stderrs:    test.stderrs,
 				WantStdins: test.wantStdins,
 			}
-			du := newWithFakeCmd(fakeCmdOpts)
+			du := newWithFakeCmd(t, fakeCmdOpts)
 			got, err := du.ListSnapshots("/example/volume")
 			if err := fakecmd.AsHelperProcessErr(err); err != nil {
 				t.Fatal(err)
@@ -363,7 +363,7 @@ func TestListSnapshots_Errors(t *testing.T) {
 				WantStdins: test.wantStdins,
 				ExitFails:  test.exitFails,
 			}
-			du := newWithFakeCmd(fakeCmdOpts)
+			du := newWithFakeCmd(t, fakeCmdOpts)
 			_, err := du.ListSnapshots("/example/volume")
 			if err := fakecmd.AsHelperProcessErr(err); err != nil {
 				t.Fatal(err)
@@ -376,7 +376,7 @@ func TestListSnapshots_Errors(t *testing.T) {
 }
 
 func TestRename(t *testing.T) {
-	du := newWithFakeCmd(fakecmd.Options{})
+	du := newWithFakeCmd(t, fakecmd.Options{})
 	err := du.Rename("/example/volume", "newname")
 	if err := fakecmd.AsHelperProcessErr(err); err != nil {
 		t.Fatal(err)
@@ -391,7 +391,7 @@ func TestRename_Errors(t *testing.T) {
 		Stderrs:   map[string]string{"diskutil": "example stderr"},
 		ExitFails: map[string]bool{"diskutil": true},
 	}
-	du := newWithFakeCmd(fakeCmdOpts)
+	du := newWithFakeCmd(t, fakeCmdOpts)
 	err := du.Rename("/example/volume", "newname")
 	if err := fakecmd.AsHelperProcessErr(err); err != nil {
 		t.Fatal(err)
@@ -403,7 +403,7 @@ func TestRename_Errors(t *testing.T) {
 }
 
 func TestDeleteSnapshot(t *testing.T) {
-	du := newWithFakeCmd(fakecmd.Options{})
+	du := newWithFakeCmd(t, fakecmd.Options{})
 	err := du.DeleteSnapshot("/example/volume", Snapshot{
 		Name: "example-snapshot",
 		UUID: "example-snapshot-uuid",
@@ -421,7 +421,7 @@ func TestDeleteSnapshot_Errors(t *testing.T) {
 		Stderrs:   map[string]string{"diskutil": "example stderr"},
 		ExitFails: map[string]bool{"diskutil": true},
 	}
-	du := newWithFakeCmd(fakeCmdOpts)
+	du := newWithFakeCmd(t, fakeCmdOpts)
 	err := du.DeleteSnapshot("/example/volume", Snapshot{
 		Name: "example-snapshot",
 		UUID: "example-snapshot-uuid",

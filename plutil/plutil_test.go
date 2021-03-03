@@ -66,7 +66,7 @@ func TestDecodePlist(t *testing.T) {
 				Stderrs:    map[string]string{"plutil": test.stderr},
 				WantStdins: map[string]string{"plutil": test.wantStdin},
 			}
-			execCmd := fakecmd.FakeCommand(fakeCmdOpts)
+			execCmd := fakecmd.FakeCommand(t, fakeCmdOpts)
 			pl := New(WithExecCommand(execCmd))
 			got := simpleStruct{}
 			err := pl.DecodePlist(test.r, &got)
@@ -115,7 +115,7 @@ func TestDecodePlist_Errors(t *testing.T) {
 				Stderrs:   map[string]string{"plutil": test.stderr},
 				ExitFails: map[string]bool{"plutil": test.exitFail},
 			}
-			execCmd := fakecmd.FakeCommand(fakeCmdOpts)
+			execCmd := fakecmd.FakeCommand(t, fakeCmdOpts)
 			pl := New(WithExecCommand(execCmd))
 			err := pl.DecodePlist(nil, &simpleStruct{})
 			if err := fakecmd.AsHelperProcessErr(err); err != nil {

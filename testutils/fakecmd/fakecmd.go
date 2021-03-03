@@ -31,7 +31,7 @@
 //
 //	func TestCountFiles(t *testing.T) {
 //		t.Cleanup(func() { execCommand = exec.Command })
-//		execCommand = fakecmd.FakeCommand(fakecmd.Options{
+//		execCommand = fakecmd.FakeCommand(t, fakecmd.Options{
 //			Stdouts: map[string]string{
 //				"ls": "example-ls-stdout",
 //				"wc": "     5",
@@ -74,13 +74,16 @@ type Options struct {
 	WantStdins map[string]string
 	// If true, the command will exit with exit code 1.
 	ExitFails map[string]bool
+	// TODO: document.
+	WantArgs map[string]map[string]string
 }
 
 // FakeCommand returns a function suitable for replacing a call to
 // exec.Command in tests. Inspired by the stdlib's exec_test. Modified to allow
 // specifying different stdouts, stderrs, stdins, and exit codes per command.
-func FakeCommand(opt Options) func(string, ...string) *exec.Cmd {
+func FakeCommand(t *testing.T, opt Options) func(string, ...string) *exec.Cmd {
 	return func(name string, args ...string) *exec.Cmd {
+		validateArgs(t, name, opt.WantArgs[name], args)
 		cmd := exec.Command(os.Args[0], "-test.run=TestHelperProcess")
 		cmd.Env = append(os.Environ(),
 			"GO_WANT_HELPER_PROCESS=1",
@@ -94,6 +97,37 @@ func FakeCommand(opt Options) func(string, ...string) *exec.Cmd {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("GO_HELPER_PROCESS_WANT_STDIN=%s", wantStdin))
 		}
 		return cmd
+	}
+}
+
+func validateArgs(t *testing.T, name string, want map[string]string, got []string) {
+	// TODO: this is O(n^2). Is there a better algorithm?
+	//
+	// TODO: this algorithm will not error if there are overlapping
+	//       matches. Is there an efficient algorithm for finding if `got`
+	//       contains all non-overlapping key-value pairs in `want`?
+	for wantArg, wantVal := range want {
+		foundArg := false
+		for i, gotArg := range got {
+			if gotArg != wantArg {
+				continue
+			}
+			foundArg = true
+			if wantVal == "" {
+				break
+			}
+			var gotVal string
+			if i+1 < len(got) {
+				gotVal = got[i+1]
+			}
+			if gotVal != wantVal {
+				t.Errorf("expected %q to be called with arg %s=%s, but got %s=%s", name, wantArg, wantVal, wantArg, gotVal)
+			}
+			break
+		}
+		if !foundArg {
+			t.Errorf("expected %q to be called with arg %s=%s", name, wantArg, wantVal)
+		}
 	}
 }
 

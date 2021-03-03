@@ -22,7 +22,7 @@ func TestRestore_WritesOutputToStdout(t *testing.T) {
 	defer pw.Close()
 
 	a := New()
-	a.execCommand = fakecmd.FakeCommand(fakecmd.Options{
+	a.execCommand = fakecmd.FakeCommand(t, fakecmd.Options{
 		Stdouts: map[string]string{
 			"asr": "want stdout",
 		},
@@ -46,5 +46,47 @@ func TestRestore_WritesOutputToStdout(t *testing.T) {
 	}
 	if string(gotStdout) != "want stdout" {
 		t.Errorf("Restore wrote unexpected value to stdout: %q, want: %q", gotStdout, "want stdout")
+	}
+}
+
+func TestRestore_CmdArgs(t *testing.T) {
+	source := diskutil.VolumeInfo{
+		UUID:       "source-volume-uuid",
+		Name:       "source-volume-name",
+		MountPoint: "/source/mount/point",
+		Device:     "/dev/source-device",
+	}
+	target := diskutil.VolumeInfo{
+		UUID:       "target-volume-uuid",
+		Name:       "target-volume-name",
+		MountPoint: "/target/mount/point",
+		Device:     "/dev/target-device",
+	}
+	to := diskutil.Snapshot{
+		UUID: "to-snapshot-uuid",
+		Name: "to-snapshot-name",
+	}
+	from := diskutil.Snapshot{
+		UUID: "from-snapshot-uuid",
+		Name: "from-snapshot-name",
+	}
+
+	a := New()
+	a.execCommand = fakecmd.FakeCommand(t, fakecmd.Options{
+		WantArgs: map[string]map[string]string{
+			"asr": map[string]string{
+				"--source":       source.MountPoint,
+				"--target":       target.MountPoint,
+				"--toSnapshot":   to.UUID,
+				"--fromSnapshot": from.UUID,
+			},
+		},
+	})
+	err := a.Restore(source, target, to, from)
+	if err := fakecmd.AsHelperProcessErr(err); err != nil {
+		t.Fatal(err)
+	}
+	if err != nil {
+		t.Fatalf("Restore returned unexpected error: %v, want: nil", err)
 	}
 }
