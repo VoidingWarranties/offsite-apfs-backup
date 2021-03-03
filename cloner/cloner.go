@@ -17,10 +17,22 @@ func Prune(prune bool) Option {
 	}
 }
 
+func WithDiskUtil(du du) Option {
+	return func(c *Cloner) {
+		c.diskutil = du
+	}
+}
+
+func WithASR(r restorer) Option {
+	return func(c *Cloner) {
+		c.asr = r
+	}
+}
+
 func New(opts ...Option) Cloner {
 	c := Cloner {
-		diskutil: diskutil.DiskUtil{},
-		asr:      asr.ASR{},
+		diskutil: diskutil.New(),
+		asr:      asr.New(),
 	}
 	for _, opt := range opts {
 		opt(&c)
@@ -100,6 +112,7 @@ func latestCommonSnapshot(source, target []diskutil.Snapshot) (diskutil.Snapshot
 	if commonSourceI == 0 && commonTargetI == 0 {
 		return diskutil.Snapshot{}, errors.New("both source and target have the same latest snapshot")
 	}
+	// TODO: is this logic correct? Shouldn't it be `commonSourceI < commonTargetI`?
 	if commonSourceI == 0 {
 		return diskutil.Snapshot{}, errors.New("target has a snapshot ahead of source")
 	}
