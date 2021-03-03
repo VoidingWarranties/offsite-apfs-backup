@@ -32,7 +32,7 @@ func WithASR(r restorer) Option {
 func New(opts ...Option) Cloner {
 	c := Cloner {
 		diskutil: diskutil.New(),
-		asr:      asr.ASR{},
+		asr:      asr.New(),
 	}
 	for _, opt := range opts {
 		opt(&c)

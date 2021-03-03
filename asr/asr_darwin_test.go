@@ -26,7 +26,7 @@ func TestRestore(t *testing.T) {
 	to := diskimage.SourceSnaps[0]
 	from := diskimage.SourceSnaps[1]
 
-	r := asr.ASR{}
+	r := asr.New()
 	if err := r.Restore(source, target, to, from); err != nil {
 		t.Fatalf("Restore returned unexpected error: %v, want: nil", err)
 	}
@@ -153,7 +153,7 @@ func TestRestore_Errors(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			source, target := test.setup(t)
-			r := asr.ASR{}
+			r := asr.New()
 			err := r.Restore(source, target, test.to, test.from)
 			if err == nil {
 				t.Fatal("Restore returned unexpected error: nil, want: non-nil")
