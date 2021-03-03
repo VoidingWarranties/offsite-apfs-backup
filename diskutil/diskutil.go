@@ -2,23 +2,51 @@ package diskutil
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"os/exec"
 	"regexp"
 	"sort"
 	"time"
+
+	"apfs-snapshot-diff-clone/plutil"
 )
 
-var execCommand = exec.Command
+type DiskUtil struct {
+	execCommand func(string, ...string) *exec.Cmd
+	pl          plutil.PLUtil
+}
 
-type DiskUtil struct {}
+type Option func(*DiskUtil)
 
-func (d DiskUtil) Rename(volume string, name string) error {
-	cmd := execCommand("diskutil", "rename", volume, name)
+func WithExecCommand(f func(string, ...string) *exec.Cmd) Option {
+	return func(du *DiskUtil) {
+		du.execCommand = f
+	}
+}
+
+func WithPLUtil(pl plutil.PLUtil) Option {
+	return func(du *DiskUtil) {
+		du.pl = pl
+	}
+}
+
+func New(opts ...Option) DiskUtil {
+	du := DiskUtil{}
+	defaultOpts := []Option{
+		WithExecCommand(exec.Command),
+		WithPLUtil(plutil.New(plutil.WithExecCommand(exec.Command))),
+	}
+	opts = append(defaultOpts, opts...)
+	for _, opt := range opts {
+		opt(&du)
+	}
+	return du
+}
+
+func (du DiskUtil) Rename(volume string, name string) error {
+	cmd := du.execCommand("diskutil", "rename", volume, name)
 	cmd.Stdout = os.Stdout
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
@@ -37,10 +65,10 @@ type VolumeInfo struct {
 	Device     string `json:"DeviceNode"`
 }
 
-func (d DiskUtil) Info(volume string) (VolumeInfo, error) {
-	cmd := execCommand("diskutil", "info", "-plist", volume)
+func (du DiskUtil) Info(volume string) (VolumeInfo, error) {
+	cmd := du.execCommand("diskutil", "info", "-plist", volume)
 	var info VolumeInfo
-	err := runAndDecodePlist(cmd, &info)
+	err := du.runAndDecodePlist(cmd, &info)
 	return info, err
 }
 
@@ -54,12 +82,12 @@ func (s Snapshot) String() string {
 	return fmt.Sprintf("%s (%s)", s.Name, s.UUID)
 }
 
-func (d DiskUtil) ListSnapshots(volume string) ([]Snapshot, error) {
-	cmd := execCommand("diskutil", "apfs", "listsnapshots", "-plist", volume)
+func (du DiskUtil) ListSnapshots(volume string) ([]Snapshot, error) {
+	cmd := du.execCommand("diskutil", "apfs", "listsnapshots", "-plist", volume)
 	var snapshotList struct {
 		Snapshots []Snapshot `json:"Snapshots"`
 	}
-	err := runAndDecodePlist(cmd, &snapshotList)
+	err := du.runAndDecodePlist(cmd, &snapshotList)
 	if err != nil {
 		return nil, err
 	}
@@ -111,8 +139,8 @@ func parseTimeFromSnapshotName(name string) (time.Time, error) {
 	return created, nil
 }
 
-func (d DiskUtil) DeleteSnapshot(volume string, snap Snapshot) error {
-	cmd := execCommand("diskutil", "apfs", "deletesnapshot", volume, "-uuid", snap.UUID)
+func (du DiskUtil) DeleteSnapshot(volume string, snap Snapshot) error {
+	cmd := du.execCommand("diskutil", "apfs", "deletesnapshot", volume, "-uuid", snap.UUID)
 	cmd.Stdout = os.Stdout
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
@@ -124,13 +152,13 @@ func (d DiskUtil) DeleteSnapshot(volume string, snap Snapshot) error {
 	return nil
 }
 
-func runAndDecodePlist(cmd *exec.Cmd, v interface{}) error {
+func (du DiskUtil) runAndDecodePlist(cmd *exec.Cmd, v interface{}) error {
 	log.Printf("Running command:\n%s", cmd)
 	stdout, err := cmd.Output()
 	r := bytes.NewReader(stdout)
 	if err != nil {
 		var errMsg plistErrorMessage
-		if perr := decodePlist(r, &errMsg); perr == nil && errMsg.IsError {
+		if perr := du.pl.DecodePlist(r, &errMsg); perr == nil && errMsg.IsError {
 			plistErr := plistError{
 				message: errMsg.Message,
 				cmdErr:  err,
@@ -142,7 +170,7 @@ func runAndDecodePlist(cmd *exec.Cmd, v interface{}) error {
 		}
 		return fmt.Errorf("`%s` failed (%w)", cmd, err)
 	}
-	if err := decodePlist(r, v); err != nil {
+	if err := du.pl.DecodePlist(r, v); err != nil {
 		return fmt.Errorf("error parsing plist: %w", err)
 	}
 	return nil
@@ -164,26 +192,4 @@ func (err plistError) Unwrap() error {
 type plistErrorMessage struct {
 	IsError bool   `json:"Error"`
 	Message string `json:"ErrorMessage"`
-}
-
-func decodePlist(r io.Reader, v interface{}) error {
-	cmd := execCommand(
-		"plutil",
-		"-convert", "json",
-		// Read from stdin.
-		"-",
-		// Output to stdout.
-		"-o", "-")
-	cmd.Stdin = r
-	stdout, err := cmd.Output()
-	if exitErr, ok := err.(*exec.ExitError); ok {
-		return fmt.Errorf("`%s` failed (%w) with stderr: %s", cmd, err, exitErr.Stderr)
-	}
-	if err != nil {
-		return fmt.Errorf("`%s` failed (%w)", cmd, err)
-	}
-	if err := json.Unmarshal(stdout, v); err != nil {
-		return fmt.Errorf("failed to parse json: %w", err)
-	}
-	return nil
 }

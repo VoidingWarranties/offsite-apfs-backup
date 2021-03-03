@@ -1,20 +1,23 @@
 // +build darwin
 
-package testutil
+package diskimage
 
 import (
 	"bytes"
+	"errors"
+	"io"
 	"testing"
 	"time"
 	"os/exec"
 	"path/filepath"
 
 	"apfs-snapshot-diff-clone/diskutil"
+	"apfs-snapshot-diff-clone/plutil"
 )
 
 const (
-	SourceImg        = "testdata/source.dmg"
-	TargetImg        = "testdata/target.dmg"
+	SourceImg = "testdata/source.dmg"
+	TargetImg = "testdata/target.dmg"
 )
 
 var (
@@ -50,19 +53,27 @@ var (
 
 // MountRO mounts the disk image at `path` as a readonly volume and
 // returns the mount point.
-//
-// TODO: use plutil to parse the output and also return the device.
-func MountRO(t *testing.T, path string) (mountpoint string) {
+func MountRO(t *testing.T, path string) (mountpoint, device string) {
 	t.Helper()
 
 	mountpoint = t.TempDir()
 	cmd := exec.Command(
 		"hdiutil", "attach",
+		// There's an odd bug in MacOS where repeatedly calling
+		// `hdiutil attach` and `hdiutil detach` on an image and it's
+		// volume will cause Finder to sometimes display multiple
+		// Macintosh HD volumes. The -nobrowse flag seems to prevent
+		// the visible symptoms of this bug, but this could also just
+		// be hiding weirdness.
+		"-nobrowse",
+		"-plist",
 		"-readonly",
 		"-mountpoint", mountpoint,
 		path,
 	)
+	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
+	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	err := cmd.Run()
 	// TODO: it would be nice if *exec.ExitError.Error() included the stderr, if any.
@@ -70,21 +81,19 @@ func MountRO(t *testing.T, path string) (mountpoint string) {
 		t.Fatalf("failed to mount %q (%v): %s", path, err, stderr)
 	}
 	// Mount point may have changed by the time we cleanup (e.g. by `asr
-	// restore`). Get the VolumeInfo in order to get the device node to use
-	// during cleanup.
-	du := diskutil.DiskUtil{}
-	info, err := du.Info(mountpoint)
+	// restore`). Get the the device node to use during cleanup.
+	device, err = parseHdiutilAttachOutput(stdout)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		cmd := exec.Command("hdiutil", "detach", "-force", info.Device)
+		cmd := exec.Command("hdiutil", "detach", "-force", device)
 		err := cmd.Run()
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			t.Fatalf("failed to unmount %q: %v: %s", info.Device, err, exitErr.Stderr)
+			t.Fatalf("failed to unmount %q: %v: %s", device, err, exitErr.Stderr)
 		}
 		if err != nil {
-			t.Fatalf("failed to unmount %q: %v", info.Device, err)
+			t.Fatalf("failed to unmount %q: %v", device, err)
 		}
 	})
 	// t.TempDir can return a path that contains a symlink. Evaluate the
@@ -96,48 +105,77 @@ func MountRO(t *testing.T, path string) (mountpoint string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return mountpoint
+	return mountpoint, device
 }
 
 // MountRW mounts the disk image at `path` as a read/write volume
 // using a shadow file. All modifications to the volume are written to
 // the shadow file rather than the disk image.
-func MountRW(t *testing.T, path string) (mountpoint string) {
+func MountRW(t *testing.T, path string) (mountpoint, device string) {
 	t.Helper()
 
 	mountpoint = t.TempDir()
 	shadow := filepath.Join(t.TempDir(), "shadow")
 	cmd := exec.Command(
 		"hdiutil", "attach",
+		"-nobrowse",
+		"-plist",
 		"-shadow", shadow,
 		"-mountpoint", mountpoint,
 		path,
 	)
+	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
+	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	err := cmd.Run()
 	// TODO: it would be nice if *exec.ExitError.Error() included the stderr, if any.
 	if err != nil {
 		t.Fatalf("failed to mount %q (%v): %s", path, err, stderr)
 	}
-	du := diskutil.DiskUtil{}
-	info, err := du.Info(mountpoint)
+	device, err = parseHdiutilAttachOutput(stdout)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		cmd := exec.Command("hdiutil", "detach", "-force", info.Device)
+		cmd := exec.Command("hdiutil", "detach", "-force", device)
 		err := cmd.Run()
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			t.Fatalf("failed to unmount %q: %v: %s", info.Device, err, exitErr.Stderr)
+			t.Fatalf("failed to unmount %q: %v: %s", device, err, exitErr.Stderr)
 		}
 		if err != nil {
-			t.Fatalf("failed to unmount %q: %v", info.Device, err)
+			t.Fatalf("failed to unmount %q: %v", device, err)
 		}
 	})
 	mountpoint, err = filepath.EvalSymlinks(mountpoint)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return mountpoint
+	return mountpoint, device
+}
+
+func parseHdiutilAttachOutput(r io.Reader) (device string, err error) {
+	pl := plutil.New()
+	var info struct{
+		SystemEntities []struct{
+			MountPoint string `json:"mount-point"`
+			DevEntry   string `json:"dev-entry"`
+		} `json:"system-entities"`
+	}
+	if err := pl.DecodePlist(r, &info); err != nil {
+		return "", err
+	}
+	found := false
+	for _, e := range info.SystemEntities {
+		if e.MountPoint == "" {
+			continue
+		}
+		if found {
+			return "", errors.New("diskimage test utility only supports images with a single volume")
+		}
+
+		found = true
+		device = e.DevEntry
+	}
+	return device, nil
 }
