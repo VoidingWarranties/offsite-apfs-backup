@@ -14,8 +14,8 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
-func TestHelperProcess(*testing.T) {
-	fakecmd.HelperProcess()
+func TestHelperProcess(t *testing.T) {
+	fakecmd.HelperProcess(t)
 }
 
 func newWithFakeCmd(opts fakecmd.Options) DiskUtil {

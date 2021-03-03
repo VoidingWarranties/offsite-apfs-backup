@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	sourceImg = filepath.Join("../testutils", diskimage.SourceImg)
-	targetImg = filepath.Join("../testutils", diskimage.TargetImg)
+	sourceImg = filepath.Join("../testutils/diskimage", diskimage.SourceImg)
+	targetImg = filepath.Join("../testutils/diskimage", diskimage.TargetImg)
 
 	sourceInfo = diskimage.SourceInfo
 	targetInfo = diskimage.TargetInfo

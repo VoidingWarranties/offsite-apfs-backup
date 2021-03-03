@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	sourceImg = filepath.Join("../testutils", diskimage.SourceImg)
-	targetImg = filepath.Join("../testutils", diskimage.TargetImg)
+	sourceImg = filepath.Join("../testutils/diskimage", diskimage.SourceImg)
+	targetImg = filepath.Join("../testutils/diskimage", diskimage.TargetImg)
 )
 
 func TestRestore(t *testing.T) {

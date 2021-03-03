@@ -14,8 +14,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestHelperProcess(*testing.T) {
-	fakecmd.HelperProcess()
+func TestHelperProcess(t *testing.T) {
+	fakecmd.HelperProcess(t)
 }
 
 type simpleStruct struct {

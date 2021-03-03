@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	img      = filepath.Join("../testutils/", diskimage.SourceImg)
+	img      = filepath.Join("../testutils/diskimage", diskimage.SourceImg)
 	imgInfo  = diskimage.SourceInfo
 	imgSnaps = diskimage.SourceSnaps
 )

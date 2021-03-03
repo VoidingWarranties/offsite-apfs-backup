@@ -1,3 +1,56 @@
+// Package fakecmd provides utilities for testing code that contains calls to
+// exec.Command. For example, consider the following function to test:
+//	var execCommand = exec.Command
+//
+//	func CountFiles(path string) (int, error) {
+//		lsCmd := execCommand("ls", path)
+//		lsStdout, err := lsCmd.StdoutPipe()
+//		if err != nil {
+//			return 0, err
+//		}
+//		if err := lsCmd.Start(); err != nil {
+//			return 0, err
+//		}
+//
+//		wcCmd := execCommand("wc", "-l")
+//		wcCmd.Stdin = lsStdout
+//		wcStdout, err := wcCmd.Output()
+//		if err != nil {
+//			return 0, fmt.Errorf("wc error: %w", err)
+//		}
+//		if err := lsCmd.Wait(); err != nil {
+//			return 0, fmt.Errorf("ls error: %w", err)
+//		}
+//		return strconv.Atoi(strings.TrimSpace(wcStdout))
+//	}
+//
+// This function can be tested using the fakecmd package like so:
+//	func TestHelperProcess(t *testing.T) {
+//		fakecmd.HelperProcess(t)
+//	}
+//
+//	func TestCountFiles(t *testing.T) {
+//		t.Cleanup(func() { execCommand = exec.Command })
+//		execCommand = fakecmd.FakeCommand(fakecmd.Options{
+//			Stdouts: map[string]string{
+//				"ls": "example-ls-stdout",
+//				"wc": "     5",
+//			},
+//			Stdins: map[string]string{
+//				"wc": "example-ls-stdout",
+//			},
+//		})
+//		got, err := CountFiles("/example/path")
+//		if err := fakecmd.AsHelperProcessErr(err); err != nil {
+//			t.Fatal(err)
+//		}
+//		if err != nil {
+//			t.Fatalf("CountFiles returned unexpected error: %v, want: nil", err)
+//		}
+//		if got != 5 {
+//			t.Errorf("CountFiles returned unexpected number of files: %d, want: 5", got)
+//		}
+//	}
 package fakecmd
 
 import (
@@ -6,15 +59,26 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"testing"
 )
 
+// Options defines the behaviors of commands faked by FakeCommand. All keys in
+// the maps are command names.
 type Options struct {
-	Stdouts    map[string]string
-	Stderrs    map[string]string
+	// Value to output to stdout.
+	Stdouts map[string]string
+	// Value to output to stderr.
+	Stderrs map[string]string
+	// Value expected by stdin. If another value is received, the helper
+	// process exits in such a way that AsHelperProcessErr returns non-nil.
 	WantStdins map[string]string
-	ExitFails  map[string]bool
+	// If true, the command will exit with exit code 1.
+	ExitFails map[string]bool
 }
 
+// FakeCommand returns a function suitable for replacing a call to
+// exec.Command in tests. Inspired by the stdlib's exec_test. Modified to allow
+// specifying different stdouts, stderrs, stdins, and exit codes per command.
 func FakeCommand(opt Options) func(string, ...string) *exec.Cmd {
 	return func(name string, args ...string) *exec.Cmd {
 		cmd := exec.Command(os.Args[0], "-test.run=TestHelperProcess")
@@ -39,7 +103,17 @@ func FakeCommand(opt Options) func(string, ...string) *exec.Cmd {
 // test case.
 const helperProcessErrExitCode = 42
 
-func HelperProcess() {
+// HelperProcess writes the values of environment variables
+// GO_HELPER_PROCESS_STDOUT and GO_HELPER_PROCESS_STDERR to standard out and
+// standard error, respectively. It also validates that the standard input
+// matches the value of environment variable GO_HELPER_PROCESS_WANT_STDIN.
+//
+// HelperProcess must be called, and only called, in a test function named
+// TestHelperProcess that does nothing else.
+func HelperProcess(t *testing.T) {
+	if t.Name() != "TestHelperProcess" {
+		panic("HelperProcess must be called (and only called) in a test function named TestHelperProcess")
+	}
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
 	}

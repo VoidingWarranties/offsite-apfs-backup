@@ -1,5 +1,9 @@
 // +build darwin
 
+// Package diskimage provides utilities for mounting disk images in tests, as
+// well as volume and snapshot metadata for the disk images in testdata/.
+// Images are mounted in a temporary directory, and automatically unmounted
+// during test cleanup.
 package diskimage
 
 import (
@@ -15,11 +19,13 @@ import (
 	"apfs-snapshot-diff-clone/plutil"
 )
 
+// Relative path from testutils to example images.
 const (
 	SourceImg = "testdata/source.dmg"
 	TargetImg = "testdata/target.dmg"
 )
 
+// Expected metadata for each example image.
 var (
 	SourceInfo = diskutil.VolumeInfo{
 		Name: "source",
@@ -52,7 +58,7 @@ var (
 )
 
 // MountRO mounts the disk image at `path` as a readonly volume and
-// returns the mount point.
+// returns the mount point and device node.
 func MountRO(t *testing.T, path string) (mountpoint, device string) {
 	t.Helper()
 
@@ -129,7 +135,6 @@ func MountRW(t *testing.T, path string) (mountpoint, device string) {
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	err := cmd.Run()
-	// TODO: it would be nice if *exec.ExitError.Error() included the stderr, if any.
 	if err != nil {
 		t.Fatalf("failed to mount %q (%v): %s", path, err, stderr)
 	}
