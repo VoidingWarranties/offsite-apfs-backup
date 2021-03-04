@@ -1,3 +1,5 @@
+// Package asr implements restoring volumes to APFS snapshots using MacOS's
+// Apple Software Restore utility.
 package asr
 
 import (
@@ -11,11 +13,13 @@ import (
 	"apfs-snapshot-diff-clone/diskutil"
 )
 
+// ASR restores a target volume to a source volume's APFS snapshot.
 type ASR struct {
 	execCommand func(string, ...string) *exec.Cmd
 	osStdout    io.Writer
 }
 
+// New returns a new ASR.
 func New() ASR {
 	return ASR{
 		execCommand: exec.Command,
@@ -23,6 +27,9 @@ func New() ASR {
 	}
 }
 
+// Restore the target volume to the source volume's `to` snapshot, from the
+// target volume's `from` snapshot. Both to and from must exist in source. From
+// must also exist in target.
 func (a ASR) Restore(source, target diskutil.VolumeInfo, to, from diskutil.Snapshot) error {
 	cmd := a.execCommand(
 		"asr", "restore",
