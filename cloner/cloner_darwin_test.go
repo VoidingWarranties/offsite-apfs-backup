@@ -70,6 +70,9 @@ func TestClone(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			// Ignore mount point because `asr` remounts the target in the default
+			// /Volumes mount root, which will be different than our temporary test
+			// directory mount point.
 			ignoreMountPointOpt := cmpopts.IgnoreFields(diskutil.VolumeInfo{}, "MountPoint")
 			if diff := cmp.Diff(wantTargetInfo, gotTargetInfo, ignoreMountPointOpt); diff != "" {
 				t.Errorf("Clone resulted in unexpected target VolumeInfo. -want +got:\n%s", diff)
