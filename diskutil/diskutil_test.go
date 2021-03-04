@@ -277,6 +277,28 @@ func TestListSnapshots(t *testing.T) {
 	}
 }
 
+func TestListSnapshots_IDsVolumesByUUID(t *testing.T) {
+	du := newWithFakeCmd(t, fakecmd.Options{
+			Stdouts: map[string]string{
+				"plutil": `{
+					"Snapshots": []
+				}`,
+			},
+			WantArgs: map[string]map[string]string{
+				"diskutil": map[string]string{
+					exampleVolumeInfo.UUID: "",
+				},
+			},
+	})
+	_, err := du.ListSnapshots(exampleVolumeInfo)
+	if err := fakecmd.AsHelperProcessErr(err); err != nil {
+		t.Fatal(err)
+	}
+	if err != nil {
+		t.Fatalf("ListSnapshots returned unexpected error: %q, want: nil", err)
+	}
+}
+
 func TestListSnapshots_Errors(t *testing.T) {
 	var exitErr *exec.ExitError
 	var validationErr validationError
@@ -395,6 +417,23 @@ func TestRename(t *testing.T) {
 	}
 }
 
+func TestRename_IDsVolumesByUUID(t *testing.T) {
+	du := newWithFakeCmd(t, fakecmd.Options{
+			WantArgs: map[string]map[string]string{
+				"diskutil": map[string]string{
+					exampleVolumeInfo.UUID: "",
+				},
+			},
+	})
+	err := du.Rename(exampleVolumeInfo, "newname")
+	if err := fakecmd.AsHelperProcessErr(err); err != nil {
+		t.Fatal(err)
+	}
+	if err != nil {
+		t.Fatalf("Rename returned unexpected error: %q, want: nil", err)
+	}
+}
+
 func TestRename_Errors(t *testing.T) {
 	fakeCmdOpts := fakecmd.Options{
 		Stderrs:   map[string]string{"diskutil": "example stderr"},
@@ -422,6 +461,26 @@ func TestDeleteSnapshot(t *testing.T) {
 	}
 	if err != nil {
 		t.Fatalf("DeleteSnapshot returned unexpected error: %v, want: nil", err)
+	}
+}
+
+func TestDeleteSnapshot_IDsVolumesByUUID(t *testing.T) {
+	du := newWithFakeCmd(t, fakecmd.Options{
+			WantArgs: map[string]map[string]string{
+				"diskutil": map[string]string{
+					exampleVolumeInfo.UUID: "",
+				},
+			},
+	})
+	err := du.DeleteSnapshot(exampleVolumeInfo, Snapshot{
+		Name: "example-snapshot",
+		UUID: "example-snapshot-uuid",
+	})
+	if err := fakecmd.AsHelperProcessErr(err); err != nil {
+		t.Fatal(err)
+	}
+	if err != nil {
+		t.Fatalf("Rename returned unexpected error: %q, want: nil", err)
 	}
 }
 

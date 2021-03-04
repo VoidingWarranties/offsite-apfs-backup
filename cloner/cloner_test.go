@@ -10,8 +10,6 @@ import (
 	"apfs-snapshot-diff-clone/diskutil"
 )
 
-// TODO: how can we verify that Clone calls all DiskUtil methods with the volume UUID (rather than volume mount point)?
-
 func TestClone(t *testing.T) {
 	snap1 := diskutil.Snapshot{
 		Name:    "common-snap",
