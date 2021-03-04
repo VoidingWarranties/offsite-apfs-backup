@@ -1,10 +1,8 @@
 package plutil
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
-	"io"
 	"os/exec"
 	"reflect"
 	"testing"
@@ -22,15 +20,15 @@ type simpleStruct struct {
 	Val string `json:"val"`
 }
 
-func TestDecodePlist(t *testing.T) {
+func TestUnmarshal(t *testing.T) {
 	tests := []struct {
-		name      string
-		opts      []fakecmd.Option
-		r         io.Reader
-		want      simpleStruct
+		name string
+		opts []fakecmd.Option
+		data []byte
+		want simpleStruct
 	}{
 		{
-			name: "decodes JSON stdout",
+			name: "unmarshals JSON stdout",
 			opts: []fakecmd.Option{
 				fakecmd.Stdout("plutil", `{"val": "example"}`),
 			},
@@ -61,7 +59,7 @@ func TestDecodePlist(t *testing.T) {
 				fakecmd.Stdout("plutil", "{}"),
 				fakecmd.WantStdin("plutil", "example stdin"),
 			},
-			r:    bytes.NewBufferString("example stdin"),
+			data: []byte("example stdin"),
 			want: simpleStruct{},
 		},
 	}
@@ -70,22 +68,22 @@ func TestDecodePlist(t *testing.T) {
 			execCmd := fakecmd.FakeCommand(t, test.opts...)
 			pl := New(WithExecCommand(execCmd))
 			got := simpleStruct{}
-			err := pl.DecodePlist(test.r, &got)
+			err := pl.Unmarshal(test.data, &got)
 			if err := fakecmd.AsHelperProcessErr(err); err != nil {
 				// TODO: it would be nice if we could `t.Fatal(string(exitErr.Stderr))` instead, but exec.Cmd.Wait() does not populate this field. I don't see why it couldn't. Add it!
 				t.Fatal(err)
 			}
 			if err != nil {
-				t.Fatalf("DecodePlist returned unexpected error: %q, want: nil", err)
+				t.Fatalf("Unmarshal returned unexpected error: %q, want: nil", err)
 			}
 			if diff := cmp.Diff(test.want, got); diff != "" {
-				t.Errorf("DecodePlist resulted in unexpected value. -want +got:\n%s", diff)
+				t.Errorf("Unmarshal resulted in unexpected value. -want +got:\n%s", diff)
 			}
 		})
 	}
 }
 
-func TestDecodePlist_Errors(t *testing.T) {
+func TestUnmarshal_Errors(t *testing.T) {
 	var exitErr *exec.ExitError
 	var syntaxErr *json.SyntaxError
 
@@ -104,7 +102,7 @@ func TestDecodePlist_Errors(t *testing.T) {
 			wantErrAs: &exitErr,
 		},
 		{
-			name: "invalid JSON returns decode error",
+			name: "invalid JSON returns unmarshal error",
 			opts: []fakecmd.Option{
 				fakecmd.Stdout("plutil", "not-json"),
 			},
@@ -115,12 +113,12 @@ func TestDecodePlist_Errors(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			execCmd := fakecmd.FakeCommand(t, test.opts...)
 			pl := New(WithExecCommand(execCmd))
-			err := pl.DecodePlist(nil, &simpleStruct{})
+			err := pl.Unmarshal(nil, &simpleStruct{})
 			if err := fakecmd.AsHelperProcessErr(err); err != nil {
 				t.Fatal(err)
 			}
 			if !errors.As(err, test.wantErrAs) {
-				t.Errorf("DecodePlist returned unexpected error: %v, want type: %v", err, reflect.TypeOf(test.wantErrAs).Elem())
+				t.Errorf("Unmarshal returned unexpected error: %v, want type: %v", err, reflect.TypeOf(test.wantErrAs).Elem())
 			}
 		})
 	}

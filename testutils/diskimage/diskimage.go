@@ -7,9 +7,7 @@
 package diskimage
 
 import (
-	"bytes"
 	"errors"
-	"io"
 	"testing"
 	"time"
 	"os/exec"
@@ -77,14 +75,13 @@ func MountRO(t *testing.T, path string) (mountpoint, device string) {
 		"-mountpoint", mountpoint,
 		path,
 	)
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	err := cmd.Run()
-	// TODO: it would be nice if *exec.ExitError.Error() included the stderr, if any.
+	stdout, err := cmd.Output()
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		// TODO: it would be nice if *exec.ExitError.Error() included the stderr, if any.
+		t.Fatalf("failed to mount %q (%v) with stderr: %s", path, err, exitErr.Stderr)
+	}
 	if err != nil {
-		t.Fatalf("failed to mount %q (%v): %s", path, err, stderr)
+		t.Fatalf("failed to mount %q (%v)", path, err)
 	}
 	// Mount point may have changed by the time we cleanup (e.g. by `asr
 	// restore`). Get the the device node to use during cleanup.
@@ -130,13 +127,12 @@ func MountRW(t *testing.T, path string) (mountpoint, device string) {
 		"-mountpoint", mountpoint,
 		path,
 	)
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	err := cmd.Run()
+	stdout, err := cmd.Output()
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		t.Fatalf("failed to mount %q (%v) with stderr: %s", path, err, exitErr.Stderr)
+	}
 	if err != nil {
-		t.Fatalf("failed to mount %q (%v): %s", path, err, stderr)
+		t.Fatalf("failed to mount %q (%v)", path, err)
 	}
 	device, err = parseHdiutilAttachOutput(stdout)
 	if err != nil {
@@ -159,7 +155,7 @@ func MountRW(t *testing.T, path string) (mountpoint, device string) {
 	return mountpoint, device
 }
 
-func parseHdiutilAttachOutput(r io.Reader) (device string, err error) {
+func parseHdiutilAttachOutput(stdout []byte) (device string, err error) {
 	pl := plutil.New()
 	var info struct{
 		SystemEntities []struct{
@@ -167,7 +163,7 @@ func parseHdiutilAttachOutput(r io.Reader) (device string, err error) {
 			DevEntry   string `json:"dev-entry"`
 		} `json:"system-entities"`
 	}
-	if err := pl.DecodePlist(r, &info); err != nil {
+	if err := pl.Unmarshal(stdout, &info); err != nil {
 		return "", err
 	}
 	found := false

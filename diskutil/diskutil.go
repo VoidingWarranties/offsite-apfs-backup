@@ -153,10 +153,9 @@ func (du DiskUtil) DeleteSnapshot(volume VolumeInfo, snap Snapshot) error {
 func (du DiskUtil) runAndDecodePlist(cmd *exec.Cmd, v interface{}) error {
 	log.Printf("Running command:\n%s", cmd)
 	stdout, err := cmd.Output()
-	r := bytes.NewReader(stdout)
 	if err != nil {
 		var errMsg plistErrorMessage
-		if perr := du.pl.DecodePlist(r, &errMsg); perr == nil && errMsg.IsError {
+		if perr := du.pl.Unmarshal(stdout, &errMsg); perr == nil && errMsg.IsError {
 			plistErr := plistError{
 				message: errMsg.Message,
 				cmdErr:  err,
@@ -168,7 +167,7 @@ func (du DiskUtil) runAndDecodePlist(cmd *exec.Cmd, v interface{}) error {
 		}
 		return fmt.Errorf("`%s` failed (%w)", cmd, err)
 	}
-	if err := du.pl.DecodePlist(r, v); err != nil {
+	if err := du.pl.Unmarshal(stdout, v); err != nil {
 		return fmt.Errorf("error parsing plist: %w", err)
 	}
 	return nil
