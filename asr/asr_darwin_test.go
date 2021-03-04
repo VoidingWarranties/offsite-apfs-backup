@@ -43,7 +43,7 @@ func TestRestore(t *testing.T) {
 }
 
 func TestRestore_Errors(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name  string
 		setup func(*testing.T) (source, target diskutil.VolumeInfo)
 		to    diskutil.Snapshot
@@ -55,10 +55,10 @@ func TestRestore_Errors(t *testing.T) {
 				badMountPoint := t.TempDir()
 				badDevice := filepath.Join(badMountPoint, "notadevice")
 				source = diskutil.VolumeInfo{
-					Name: "not-a-volume",
-					UUID: "not-a-uuid",
+					Name:       "not-a-volume",
+					UUID:       "not-a-uuid",
 					MountPoint: badMountPoint,
-					Device: badDevice,
+					Device:     badDevice,
 				}
 				target = diskimage.TargetInfo
 				target.MountPoint, target.Device = diskimage.MountRW(t, targetImg)
@@ -75,10 +75,10 @@ func TestRestore_Errors(t *testing.T) {
 				badMountPoint := t.TempDir()
 				badDevice := filepath.Join(badMountPoint, "notadevice")
 				target = diskutil.VolumeInfo{
-					Name: "not-a-volume",
-					UUID: "not-a-uuid",
+					Name:       "not-a-volume",
+					UUID:       "not-a-uuid",
 					MountPoint: badMountPoint,
-					Device: badDevice,
+					Device:     badDevice,
 				}
 				return source, target
 			},

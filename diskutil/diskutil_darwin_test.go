@@ -3,8 +3,8 @@
 package diskutil_test
 
 import (
-	"testing"
 	"path/filepath"
+	"testing"
 
 	"apfs-snapshot-diff-clone/diskutil"
 	"apfs-snapshot-diff-clone/testutils/diskimage"
@@ -127,7 +127,7 @@ func TestDeleteSnapshot(t *testing.T) {
 }
 
 func TestDeleteSnapshot_Errors(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name  string
 		setup func(*testing.T)
 		info  diskutil.VolumeInfo

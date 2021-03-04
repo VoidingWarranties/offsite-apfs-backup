@@ -22,7 +22,7 @@ func TestClone(t *testing.T) {
 		Created: snap1.Created.Add(time.Hour),
 	}
 
-	tests := []struct{
+	tests := []struct {
 		name   string
 		setup  func(*testing.T, *fakeDevices)
 		opts   []Option
@@ -33,8 +33,8 @@ func TestClone(t *testing.T) {
 		wantTargetSnaps []diskutil.Snapshot
 	}{
 		{
-			name:   "incremental clone - default options",
-			setup:  func(t *testing.T, d *fakeDevices) {
+			name: "incremental clone - default options",
+			setup: func(t *testing.T, d *fakeDevices) {
 				if err := d.AddVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",
@@ -69,8 +69,8 @@ func TestClone(t *testing.T) {
 			},
 		},
 		{
-			name:   "incremental clone - prune target",
-			setup:  func(t *testing.T, d *fakeDevices) {
+			name: "incremental clone - prune target",
+			setup: func(t *testing.T, d *fakeDevices) {
 				if err := d.AddVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",
@@ -93,7 +93,7 @@ func TestClone(t *testing.T) {
 					t.Fatalf("error adding volume: %v", err)
 				}
 			},
-			opts: []Option{Prune(true)},
+			opts:   []Option{Prune(true)},
 			source: "/foo/mount/point",
 			target: "/bar/mount/point",
 			wantSourceSnaps: []diskutil.Snapshot{
@@ -165,15 +165,15 @@ func TestClone_Errors(t *testing.T) {
 		Created: snap1.Created.Add(time.Hour),
 	}
 
-	tests := []struct{
-		name string
+	tests := []struct {
+		name   string
 		setup  func(*testing.T, *fakeDevices)
 		source string
 		target string
 	}{
 		{
 			name: "source not found",
-			setup:  func(t *testing.T, d *fakeDevices) {
+			setup: func(t *testing.T, d *fakeDevices) {
 				if err := d.AddVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",
@@ -191,7 +191,7 @@ func TestClone_Errors(t *testing.T) {
 		},
 		{
 			name: "target not found",
-			setup:  func(t *testing.T, d *fakeDevices) {
+			setup: func(t *testing.T, d *fakeDevices) {
 				if err := d.AddVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",
@@ -209,7 +209,7 @@ func TestClone_Errors(t *testing.T) {
 		},
 		{
 			name: "no snapshots",
-			setup:  func(t *testing.T, d *fakeDevices) {
+			setup: func(t *testing.T, d *fakeDevices) {
 				if err := d.AddVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",
@@ -234,7 +234,7 @@ func TestClone_Errors(t *testing.T) {
 		},
 		{
 			name: "same latest snapshot",
-			setup:  func(t *testing.T, d *fakeDevices) {
+			setup: func(t *testing.T, d *fakeDevices) {
 				if err := d.AddVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",
@@ -263,7 +263,7 @@ func TestClone_Errors(t *testing.T) {
 		},
 		{
 			name: "no snapshots in common",
-			setup:  func(t *testing.T, d *fakeDevices) {
+			setup: func(t *testing.T, d *fakeDevices) {
 				if err := d.AddVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",

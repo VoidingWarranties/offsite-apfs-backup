@@ -8,10 +8,10 @@ package diskimage
 
 import (
 	"errors"
-	"testing"
-	"time"
 	"os/exec"
 	"path/filepath"
+	"testing"
+	"time"
 
 	"apfs-snapshot-diff-clone/diskutil"
 	"apfs-snapshot-diff-clone/plutil"
@@ -157,8 +157,8 @@ func MountRW(t *testing.T, path string) (mountpoint, device string) {
 
 func parseHdiutilAttachOutput(stdout []byte) (device string, err error) {
 	pl := plutil.New()
-	var info struct{
-		SystemEntities []struct{
+	var info struct {
+		SystemEntities []struct {
 			MountPoint string `json:"mount-point"`
 			DevEntry   string `json:"dev-entry"`
 		} `json:"system-entities"`

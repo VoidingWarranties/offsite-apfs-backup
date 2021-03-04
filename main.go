@@ -10,9 +10,9 @@ import (
 )
 
 var (
-	source = flag.String("source", "", "source APFS volume to clone - may be a mount point, /dev/ path, or volume UUID")
+	source  = flag.String("source", "", "source APFS volume to clone - may be a mount point, /dev/ path, or volume UUID")
 	targets targetsFlag
-	prune = flag.Bool("prune", false, "prune the latest snapshot that source and target had in common before the clone")
+	prune   = flag.Bool("prune", false, "prune the latest snapshot that source and target had in common before the clone")
 )
 
 func init() {

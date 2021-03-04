@@ -87,7 +87,7 @@ func TestUnmarshal_Errors(t *testing.T) {
 	var exitErr *exec.ExitError
 	var syntaxErr *json.SyntaxError
 
-	tests := []struct{
+	tests := []struct {
 		name      string
 		opts      []fakecmd.Option
 		wantErrAs interface{}

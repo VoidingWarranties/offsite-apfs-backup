@@ -35,7 +35,7 @@ func withASR(r restorer) Option {
 
 // New returns a new Cloner with the given options.
 func New(opts ...Option) Cloner {
-	c := Cloner {
+	c := Cloner{
 		diskutil: diskutil.New(),
 		asr:      asr.New(),
 	}

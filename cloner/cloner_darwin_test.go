@@ -26,7 +26,7 @@ var (
 )
 
 func TestClone(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name            string
 		opts            []cloner.Option
 		setup           func(*testing.T) (source, target string)
@@ -90,7 +90,7 @@ func TestClone(t *testing.T) {
 }
 
 func TestCloner_Errors(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name  string
 		setup func(*testing.T) (source, target string)
 	}{

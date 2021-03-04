@@ -28,7 +28,7 @@ func newWithFakeCmd(t *testing.T, opts ...fakecmd.Option) DiskUtil {
 }
 
 func TestInfo(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name string
 		opts []fakecmd.Option
 		want VolumeInfo
@@ -95,7 +95,7 @@ func TestInfo_Errors(t *testing.T) {
 	var exitErr *exec.ExitError
 	var plistErr plistError
 
-	tests := []struct{
+	tests := []struct {
 		name      string
 		opts      []fakecmd.Option
 		wantErrAs interface{}
@@ -167,7 +167,7 @@ var (
 )
 
 func TestListSnapshots(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name string
 		opts []fakecmd.Option
 		want []Snapshot
@@ -264,7 +264,7 @@ func TestListSnapshots_Errors(t *testing.T) {
 	var exitErr *exec.ExitError
 	var validationErr validationError
 
-	tests := []struct{
+	tests := []struct {
 		name      string
 		opts      []fakecmd.Option
 		wantErrAs interface{}
@@ -341,7 +341,7 @@ func TestListSnapshots_Errors(t *testing.T) {
 				fakecmd.WantStdin("plutil", "foo-stdout"),
 				fakecmd.ExitFail("plutil"),
 			},
-			wantErrAs:  &exitErr,
+			wantErrAs: &exitErr,
 		},
 	}
 	for _, test := range tests {
