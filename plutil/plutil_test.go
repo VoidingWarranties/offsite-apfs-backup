@@ -25,48 +25,49 @@ type simpleStruct struct {
 func TestDecodePlist(t *testing.T) {
 	tests := []struct {
 		name      string
-		stdout    string
-		stderr    string
+		opts      []fakecmd.Option
 		r         io.Reader
 		want      simpleStruct
-		wantStdin string
 	}{
 		{
-			name:   "decodes JSON stdout",
-			stdout: `{"val": "example"}`,
+			name: "decodes JSON stdout",
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("plutil", `{"val": "example"}`),
+			},
 			want: simpleStruct{
 				Val: "example",
 			},
 		},
 		{
 			name: "ignores unknown fields",
-			stdout: `{"val": "example", "unknown": "foo"}`,
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("plutil", `{"val": "example", "unknown": "foo"}`),
+			},
 			want: simpleStruct{
 				Val: "example",
 			},
 		},
 		{
-			name:   "ignores stderr (if exit code 0)",
-			stdout: "{}",
-			stderr: "example non-fatal error",
-			want:   simpleStruct{},
+			name: "ignores stderr (if exit code 0)",
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("plutil", "{}"),
+				fakecmd.Stderr("plutil", "example non-fatal error"),
+			},
+			want: simpleStruct{},
 		},
 		{
-			name:      "passes r to stdin",
-			stdout:    "{}",
-			r:         bytes.NewBufferString("example stdin"),
-			want:      simpleStruct{},
-			wantStdin: "example stdin",
+			name: "passes r to stdin",
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("plutil", "{}"),
+				fakecmd.WantStdin("plutil", "example stdin"),
+			},
+			r:    bytes.NewBufferString("example stdin"),
+			want: simpleStruct{},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeCmdOpts := fakecmd.Options{
-				Stdouts:    map[string]string{"plutil": test.stdout},
-				Stderrs:    map[string]string{"plutil": test.stderr},
-				WantStdins: map[string]string{"plutil": test.wantStdin},
-			}
-			execCmd := fakecmd.FakeCommand(t, fakeCmdOpts)
+			execCmd := fakecmd.FakeCommand(t, test.opts...)
 			pl := New(WithExecCommand(execCmd))
 			got := simpleStruct{}
 			err := pl.DecodePlist(test.r, &got)
@@ -90,32 +91,29 @@ func TestDecodePlist_Errors(t *testing.T) {
 
 	tests := []struct{
 		name      string
-		stdout    string
-		stderr    string
-		exitFail  bool
+		opts      []fakecmd.Option
 		wantErrAs interface{}
 	}{
 		{
-			name:      "non-0 exit code",
-			stdout:    "{}",
-			stderr:    "example stderr foobar",
-			exitFail:  true,
+			name: "non-0 exit code",
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("plutil", "{}"),
+				fakecmd.Stderr("plutil", "example stderr foobar"),
+				fakecmd.ExitFail("plutil"),
+			},
 			wantErrAs: &exitErr,
 		},
 		{
-			name:      "invalid JSON returns decode error",
-			stdout:    "not-json",
+			name: "invalid JSON returns decode error",
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("plutil", "not-json"),
+			},
 			wantErrAs: &syntaxErr,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeCmdOpts := fakecmd.Options{
-				Stdouts:   map[string]string{"plutil": test.stdout},
-				Stderrs:   map[string]string{"plutil": test.stderr},
-				ExitFails: map[string]bool{"plutil": test.exitFail},
-			}
-			execCmd := fakecmd.FakeCommand(t, fakeCmdOpts)
+			execCmd := fakecmd.FakeCommand(t, test.opts...)
 			pl := New(WithExecCommand(execCmd))
 			err := pl.DecodePlist(nil, &simpleStruct{})
 			if err := fakecmd.AsHelperProcessErr(err); err != nil {

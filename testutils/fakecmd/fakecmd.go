@@ -31,14 +31,10 @@
 //
 //	func TestCountFiles(t *testing.T) {
 //		t.Cleanup(func() { execCommand = exec.Command })
-//		execCommand = fakecmd.FakeCommand(t, fakecmd.Options{
-//			Stdouts: map[string]string{
-//				"ls": "example-ls-stdout",
-//				"wc": "     5",
-//			},
-//			Stdins: map[string]string{
-//				"wc": "example-ls-stdout",
-//			},
+//		execCommand = fakecmd.FakeCommand(t,
+//			fakecmd.Stdout("ls", "example-ls-stdout"),
+//			fakecmd.Stdout("wc", "     5"),
+//			fakecmd.WantStdin("wc", "example-ls-stdout"),
 //		})
 //		got, err := CountFiles("/example/path")
 //		if err := fakecmd.AsHelperProcessErr(err); err != nil {
@@ -62,38 +58,89 @@ import (
 	"testing"
 )
 
-// Options defines the behaviors of commands faked by FakeCommand. All keys in
+// config defines the behaviors of commands faked by FakeCommand. All keys in
 // the top-level maps are command names.
-type Options struct {
-	// Value to output to stdout.
-	Stdouts map[string]string
-	// Value to output to stderr.
-	Stderrs map[string]string
-	// If true, the command will exit with exit code 1.
-	ExitFails map[string]bool
-	// Value expected by stdin. If another value is received, the helper
-	// process exits in such a way that AsHelperProcessErr returns non-nil.
-	WantStdins map[string]string
-	// Set of args the command is expected to be called with.
-	WantArgs map[string]map[string]bool
+type config struct {
+	stdouts    map[string]string
+	stderrs    map[string]string
+	exitFails  map[string]bool
+	wantStdins map[string]string
+	wantArgs   map[string]map[string]bool // Map value is set of args.
+}
+
+// Option configures the behavior of a command faked by FakeCommand.
+type Option func(*config)
+
+// Stdout set the stdout that will be output by `name`.
+func Stdout(name string, stdout string) Option {
+	return func(conf *config) {
+		conf.stdouts[name] = stdout
+	}
+}
+
+// Stderr sets the stderr that will be output by `name`.
+func Stderr(name string, stderr string) Option {
+	return func(conf *config) {
+		conf.stderrs[name] = stderr
+	}
+}
+
+// ExitFail causes `name` to exit with exit code 1.
+func ExitFail(name string) Option {
+	return func(conf *config) {
+		conf.exitFails[name] = true
+	}
+}
+
+// WantStdin sets the expected value of `name`'s stdin. If a different value is
+// received, the helper process exits in such a way that AsHelperProcessErr
+// returns non-nil.
+func WantStdin(name string, stdin string) Option {
+	return func(conf *config) {
+		conf.wantStdins[name] = stdin
+	}
+}
+
+// WantArg adds `arg` to the set of `name`'s expected arguments. If `arg` is
+// not present in the command, the execCommand function returned by FakeCommand
+// will t.Error.
+func WantArg(name string, arg string) Option {
+	return func(conf *config) {
+		wantArgs := conf.wantArgs[name]
+		if wantArgs == nil {
+			wantArgs = make(map[string]bool)
+		}
+		wantArgs[arg] = true
+		conf.wantArgs[name] = wantArgs
+	}
 }
 
 // FakeCommand returns a function suitable for replacing a call to
 // exec.Command in tests. Inspired by the stdlib's exec_test. Modified to allow
 // specifying different stdouts, stderrs, stdins, and exit codes per command.
-func FakeCommand(t *testing.T, opt Options) func(string, ...string) *exec.Cmd {
+func FakeCommand(t *testing.T, opts ...Option) func(string, ...string) *exec.Cmd {
+	conf := config{
+		stdouts:    make(map[string]string),
+		stderrs:    make(map[string]string),
+		exitFails:  make(map[string]bool),
+		wantStdins: make(map[string]string),
+		wantArgs:   make(map[string]map[string]bool),
+	}
+	for _, opt := range opts {
+		opt(&conf)
+	}
 	return func(name string, args ...string) *exec.Cmd {
-		validateArgs(t, name, opt.WantArgs[name], args)
+		validateArgs(t, name, conf.wantArgs[name], args)
 		cmd := exec.Command(os.Args[0], "-test.run=TestHelperProcess")
 		cmd.Env = append(os.Environ(),
 			"GO_WANT_HELPER_PROCESS=1",
-			fmt.Sprintf("GO_HELPER_PROCESS_STDOUT=%s", opt.Stdouts[name]),
-			fmt.Sprintf("GO_HELPER_PROCESS_STDERR=%s", opt.Stderrs[name]),
+			fmt.Sprintf("GO_HELPER_PROCESS_STDOUT=%s", conf.stdouts[name]),
+			fmt.Sprintf("GO_HELPER_PROCESS_STDERR=%s", conf.stderrs[name]),
 		)
-		if exitFail := opt.ExitFails[name]; exitFail {
+		if exitFail := conf.exitFails[name]; exitFail {
 			cmd.Env = append(cmd.Env, "GO_HELPER_PROCESS_EXIT_FAIL=1")
 		}
-		if wantStdin, exists := opt.WantStdins[name]; exists {
+		if wantStdin, exists := conf.wantStdins[name]; exists {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("GO_HELPER_PROCESS_WANT_STDIN=%s", wantStdin))
 		}
 		return cmd

@@ -22,11 +22,7 @@ func TestRestore_WritesOutputToStdout(t *testing.T) {
 	defer pw.Close()
 
 	a := New()
-	a.execCommand = fakecmd.FakeCommand(t, fakecmd.Options{
-		Stdouts: map[string]string{
-			"asr": "want stdout",
-		},
-	})
+	a.execCommand = fakecmd.FakeCommand(t, fakecmd.Stdout("asr", "want stdout"))
 	a.osStdout = pw
 
 	dummyVolume := diskutil.VolumeInfo{}
@@ -75,16 +71,13 @@ func TestRestore_CmdArgs(t *testing.T) {
 	}
 
 	a := New()
-	a.execCommand = fakecmd.FakeCommand(t, fakecmd.Options{
-		WantArgs: map[string]map[string]bool{
-			"asr": map[string]bool{
-				source.Device: true,
-				target.Device: true,
-				to.UUID:       true,
-				from.UUID:     true,
-			},
-		},
-	})
+	opts := []fakecmd.Option{
+		fakecmd.WantArg("asr", source.Device),
+		fakecmd.WantArg("asr", target.Device),
+		fakecmd.WantArg("asr", to.UUID),
+		fakecmd.WantArg("asr", from.UUID),
+	}
+	a.execCommand = fakecmd.FakeCommand(t, opts...)
 	err := a.Restore(source, target, to, from)
 	if err := fakecmd.AsHelperProcessErr(err); err != nil {
 		t.Fatal(err)

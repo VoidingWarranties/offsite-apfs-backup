@@ -18,8 +18,8 @@ func TestHelperProcess(t *testing.T) {
 	fakecmd.HelperProcess(t)
 }
 
-func newWithFakeCmd(t *testing.T, opts fakecmd.Options) DiskUtil {
-	execCmd := fakecmd.FakeCommand(t, opts)
+func newWithFakeCmd(t *testing.T, opts ...fakecmd.Option) DiskUtil {
+	execCmd := fakecmd.FakeCommand(t, opts...)
 	pl := plutil.New(plutil.WithExecCommand(execCmd))
 	return New(
 		WithExecCommand(execCmd),
@@ -29,25 +29,21 @@ func newWithFakeCmd(t *testing.T, opts fakecmd.Options) DiskUtil {
 
 func TestInfo(t *testing.T) {
 	tests := []struct{
-		name       string
-		stdouts    map[string]string
-		stderrs    map[string]string
-		wantStdins map[string]string
-		want       VolumeInfo
+		name string
+		opts []fakecmd.Option
+		want VolumeInfo
 	}{
 		{
 			name: "success",
-			stdouts: map[string]string{
-				"diskutil": "<plist diskutil output>",
-				"plutil": `{
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("diskutil", "<plist diskutil output>"),
+				fakecmd.Stdout("plutil", `{
 					"VolumeUUID": "foo-uuid",
 					"VolumeName": "foo-name",
 					"MountPoint": "/foo/mount/point",
 					"DeviceNode": "/dev/disk1s2"
-				}`,
-			},
-			wantStdins: map[string]string{
-				"plutil": "<plist diskutil output>",
+				}`),
+				fakecmd.WantStdin("plutil", "<plist diskutil output>"),
 			},
 			want: VolumeInfo{
 				UUID:       "foo-uuid",
@@ -58,21 +54,17 @@ func TestInfo(t *testing.T) {
 		},
 		{
 			name: "ignores stderr (if exit code 0)",
-			stdouts: map[string]string{
-				"diskutil": "<plist diskutil output>",
-				"plutil": `{
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("diskutil", "<plist diskutil output>"),
+				fakecmd.Stdout("plutil", `{
 					"VolumeUUID": "bar-uuid",
 					"VolumeName": "bar-name",
 					"MountPoint": "/bar/mount/point",
 					"DeviceNode": "/dev/disk3s4"
-				}`,
-			},
-			stderrs: map[string]string{
-				"diskutil": "diskutil-stderr",
-				"plutil": "plutil-stderr",
-			},
-			wantStdins: map[string]string{
-				"plutil": "<plist diskutil output>",
+				}`),
+				fakecmd.Stderr("diskutil", "diskutil-stderr"),
+				fakecmd.Stderr("plutil", "plutil-stderr"),
+				fakecmd.WantStdin("plutil", "<plist diskutil output>"),
 			},
 			want: VolumeInfo{
 				UUID:       "bar-uuid",
@@ -84,12 +76,7 @@ func TestInfo(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeCmdOpts := fakecmd.Options{
-				Stdouts:    test.stdouts,
-				Stderrs:    test.stderrs,
-				WantStdins: test.wantStdins,
-			}
-			du := newWithFakeCmd(t, fakeCmdOpts)
+			du := newWithFakeCmd(t, test.opts...)
 			got, err := du.Info("/example/volume")
 			if err := fakecmd.AsHelperProcessErr(err); err != nil {
 				t.Fatal(err)
@@ -109,65 +96,56 @@ func TestInfo_Errors(t *testing.T) {
 	var plistErr plistError
 
 	tests := []struct{
-		name       string
-		stdouts    map[string]string
-		stderrs    map[string]string
-		wantStdins map[string]string
-		exitFails  map[string]bool
+		name      string
+		opts      []fakecmd.Option
 		wantErrAs interface{}
 	}{
 		{
 			name: "diskutil exec errors",
-			stdouts: map[string]string{
-				"diskutil": "foo-stdout",
-				"plutil":   "{}",
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("diskutil", "foo-stdout"),
+				fakecmd.Stdout("plutil", "{}"),
+				fakecmd.Stderr("diskutil", "stderr"),
+				fakecmd.WantStdin("plutil", "foo-stdout"),
+				fakecmd.ExitFail("diskutil"),
 			},
-			stderrs:    map[string]string{"diskutil": "stderr"},
-			wantStdins: map[string]string{"plutil": "foo-stdout"},
-			exitFails:  map[string]bool{"diskutil": true},
-			wantErrAs:  &exitErr,
+			wantErrAs: &exitErr,
 		},
 		{
 			name: "plutil exec errors",
-			stdouts: map[string]string{
-				"diskutil": "foo-stdout",
-				"plutil":   "{}",
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("diskutil", "foo-stdout"),
+				fakecmd.Stdout("plutil", "{}"),
+				fakecmd.Stderr("plutil", "stderr"),
+				fakecmd.WantStdin("plutil", "foo-stdout"),
+				fakecmd.ExitFail("plutil"),
 			},
-			stderrs:    map[string]string{"plutil": "stderr"},
-			wantStdins: map[string]string{"plutil": "foo-stdout"},
-			exitFails:  map[string]bool{"plutil": true},
-			wantErrAs:  &exitErr,
+			wantErrAs: &exitErr,
 		},
 		{
 			name: "diskutil plist error output - returns plist error",
-			stdouts: map[string]string{
-				"diskutil": "diskutil-plist-err",
-				"plutil":   `{"Error": true, "ErrorMessage": "diskutil err message"}`,
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("diskutil", "diskutil-plist-err"),
+				fakecmd.Stdout("plutil", `{"Error": true, "ErrorMessage": "diskutil err message"}`),
+				fakecmd.WantStdin("plutil", "diskutil-plist-err"),
+				fakecmd.ExitFail("diskutil"),
 			},
-			wantStdins: map[string]string{"plutil": "diskutil-plist-err"},
-			exitFails:  map[string]bool{"diskutil": true},
-			wantErrAs:  &plistErr,
+			wantErrAs: &plistErr,
 		},
 		{
 			name: "diskutil plist error output - plist error wraps exec.ExitError",
-			stdouts: map[string]string{
-				"diskutil": "diskutil-plist-err",
-				"plutil":   `{"Error": true, "ErrorMessage": "diskutil err message"}`,
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("diskutil", "diskutil-plist-err"),
+				fakecmd.Stdout("plutil", `{"Error": true, "ErrorMessage": "diskutil err message"}`),
+				fakecmd.WantStdin("plutil", "diskutil-plist-err"),
+				fakecmd.ExitFail("diskutil"),
 			},
-			wantStdins: map[string]string{"plutil": "diskutil-plist-err"},
-			exitFails:  map[string]bool{"diskutil": true},
-			wantErrAs:  &exitErr,
+			wantErrAs: &exitErr,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeCmdOpts := fakecmd.Options{
-				Stdouts:    test.stdouts,
-				Stderrs:    test.stderrs,
-				WantStdins: test.wantStdins,
-				ExitFails:  test.exitFails,
-			}
-			du := newWithFakeCmd(t, fakeCmdOpts)
+			du := newWithFakeCmd(t, test.opts...)
 			_, err := du.Info("/example/volume")
 			if err := fakecmd.AsHelperProcessErr(err); err != nil {
 				t.Fatal(err)
@@ -190,17 +168,15 @@ var (
 
 func TestListSnapshots(t *testing.T) {
 	tests := []struct{
-		name       string
-		stdouts    map[string]string
-		stderrs    map[string]string
-		wantStdins map[string]string
-		want       []Snapshot
+		name string
+		opts []fakecmd.Option
+		want []Snapshot
 	}{
 		{
 			name: "multiple snapshots",
-			stdouts: map[string]string{
-				"diskutil": "<plist diskutil output>",
-				"plutil": `{
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("diskutil", "<plist diskutil output>"),
+				fakecmd.Stdout("plutil", `{
 					"Snapshots": [
 						{
 							"SnapshotName": "foo-snapshot-name-2021-03-02-012345",
@@ -215,10 +191,8 @@ func TestListSnapshots(t *testing.T) {
 							"SnapshotUUID": "baz-snapshot-uuid"
 						}
 					]
-				}`,
-			},
-			wantStdins: map[string]string{
-				"plutil": "<plist diskutil output>",
+				}`),
+				fakecmd.WantStdin("plutil", "<plist diskutil output>"),
 			},
 			want: []Snapshot{
 				{
@@ -240,26 +214,19 @@ func TestListSnapshots(t *testing.T) {
 		},
 		{
 			name: "no snapshots",
-			stdouts: map[string]string{
-				"diskutil": "<plist diskutil output>",
-				"plutil": `{
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("diskutil", "<plist diskutil output>"),
+				fakecmd.Stdout("plutil", `{
 					"Snapshots": []
-				}`,
-			},
-			wantStdins: map[string]string{
-				"plutil": "<plist diskutil output>",
+				}`),
+				fakecmd.WantStdin("plutil", "<plist diskutil output>"),
 			},
 			want: []Snapshot{},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeCmdOpts := fakecmd.Options{
-				Stdouts:    test.stdouts,
-				Stderrs:    test.stderrs,
-				WantStdins: test.wantStdins,
-			}
-			du := newWithFakeCmd(t, fakeCmdOpts)
+			du := newWithFakeCmd(t, test.opts...)
 			got, err := du.ListSnapshots(exampleVolumeInfo)
 			if err := fakecmd.AsHelperProcessErr(err); err != nil {
 				t.Fatal(err)
@@ -278,18 +245,12 @@ func TestListSnapshots(t *testing.T) {
 }
 
 func TestListSnapshots_IDsVolumesByUUID(t *testing.T) {
-	du := newWithFakeCmd(t, fakecmd.Options{
-			Stdouts: map[string]string{
-				"plutil": `{
-					"Snapshots": []
-				}`,
-			},
-			WantArgs: map[string]map[string]bool{
-				"diskutil": map[string]bool{
-					exampleVolumeInfo.UUID: true,
-				},
-			},
-	})
+	du := newWithFakeCmd(t,
+		fakecmd.Stdout("plutil", `{
+			"Snapshots": []
+		}`),
+		fakecmd.WantArg("diskutil", exampleVolumeInfo.UUID),
+	)
 	_, err := du.ListSnapshots(exampleVolumeInfo)
 	if err := fakecmd.AsHelperProcessErr(err); err != nil {
 		t.Fatal(err)
@@ -304,18 +265,15 @@ func TestListSnapshots_Errors(t *testing.T) {
 	var validationErr validationError
 
 	tests := []struct{
-		name       string
-		stdouts    map[string]string
-		stderrs    map[string]string
-		wantStdins map[string]string
-		exitFails  map[string]bool
+		name      string
+		opts      []fakecmd.Option
 		wantErrAs interface{}
 	}{
 		{
 			name: "snapshots in unexpected order",
-			stdouts: map[string]string{
-				"diskutil": "foo-stdout",
-				"plutil": `{
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("diskutil", "foo-stdout"),
+				fakecmd.Stdout("plutil", `{
 					"Snapshots": [
 						{
 							"SnapshotName": "bar-snapshot-name-2021-04-03-012345",
@@ -326,75 +284,69 @@ func TestListSnapshots_Errors(t *testing.T) {
 							"SnapshotUUID": "foo-snapshot-uuid"
 						}
 					]
-				}`,
+				}`),
+				fakecmd.WantStdin("plutil", "foo-stdout"),
 			},
-			wantStdins: map[string]string{"plutil": "foo-stdout"},
 			wantErrAs: &validationErr,
 		},
 		{
 			name: "no time in name",
-			stdouts: map[string]string{
-				"diskutil": "foo-stdout",
-				"plutil": `{
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("diskutil", "foo-stdout"),
+				fakecmd.Stdout("plutil", `{
 					"Snapshots": [
 						{
 							"SnapshotName": "foo-snapshot-name",
 							"SnapshotUUID": "foo-snapshot-uuid"
 						}
 					]
-				}`,
+				}`),
+				fakecmd.WantStdin("plutil", "foo-stdout"),
 			},
-			wantStdins: map[string]string{"plutil": "foo-stdout"},
 			wantErrAs: &validationErr,
 		},
 		{
 			name: "invalid time in name",
-			stdouts: map[string]string{
-				"diskutil": "foo-stdout",
-				"plutil": `{
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("diskutil", "foo-stdout"),
+				fakecmd.Stdout("plutil", `{
 					"Snapshots": [
 						{
 							"SnapshotName": "foo-snapshot-name-2021-13-01-000000",
 							"SnapshotUUID": "foo-snapshot-uuid"
 						}
 					]
-				}`,
+				}`),
+				fakecmd.WantStdin("plutil", "foo-stdout"),
 			},
-			wantStdins: map[string]string{"plutil": "foo-stdout"},
 			wantErrAs: &validationErr,
 		},
 		{
 			name: "diskutil exec errors",
-			stdouts: map[string]string{
-				"diskutil": "foo-stdout",
-				"plutil":   "{}",
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("diskutil", "foo-stdout"),
+				fakecmd.Stdout("plutil", "{}"),
+				fakecmd.Stderr("diskutil", "stderr"),
+				fakecmd.WantStdin("plutil", "foo-stdout"),
+				fakecmd.ExitFail("diskutil"),
 			},
-			stderrs:    map[string]string{"diskutil": "stderr"},
-			wantStdins: map[string]string{"plutil": "foo-stdout"},
-			exitFails:  map[string]bool{"diskutil": true},
-			wantErrAs:  &exitErr,
+			wantErrAs: &exitErr,
 		},
 		{
 			name: "plutil exec errors",
-			stdouts: map[string]string{
-				"diskutil": "foo-stdout",
-				"plutil":   "{}",
+			opts: []fakecmd.Option{
+				fakecmd.Stdout("diskutil", "foo-stdout"),
+				fakecmd.Stdout("plutil", "{}"),
+				fakecmd.Stderr("plutil", "stderr"),
+				fakecmd.WantStdin("plutil", "foo-stdout"),
+				fakecmd.ExitFail("plutil"),
 			},
-			stderrs:    map[string]string{"plutil": "stderr"},
-			wantStdins: map[string]string{"plutil": "foo-stdout"},
-			exitFails:  map[string]bool{"plutil": true},
 			wantErrAs:  &exitErr,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeCmdOpts := fakecmd.Options{
-				Stdouts:    test.stdouts,
-				Stderrs:    test.stderrs,
-				WantStdins: test.wantStdins,
-				ExitFails:  test.exitFails,
-			}
-			du := newWithFakeCmd(t, fakeCmdOpts)
+			du := newWithFakeCmd(t, test.opts...)
 			_, err := du.ListSnapshots(exampleVolumeInfo)
 			if err := fakecmd.AsHelperProcessErr(err); err != nil {
 				t.Fatal(err)
@@ -407,7 +359,7 @@ func TestListSnapshots_Errors(t *testing.T) {
 }
 
 func TestRename(t *testing.T) {
-	du := newWithFakeCmd(t, fakecmd.Options{})
+	du := newWithFakeCmd(t)
 	err := du.Rename(exampleVolumeInfo, "newname")
 	if err := fakecmd.AsHelperProcessErr(err); err != nil {
 		t.Fatal(err)
@@ -418,13 +370,7 @@ func TestRename(t *testing.T) {
 }
 
 func TestRename_IDsVolumesByUUID(t *testing.T) {
-	du := newWithFakeCmd(t, fakecmd.Options{
-			WantArgs: map[string]map[string]bool{
-				"diskutil": map[string]bool{
-					exampleVolumeInfo.UUID: true,
-				},
-			},
-	})
+	du := newWithFakeCmd(t, fakecmd.WantArg("diskutil", exampleVolumeInfo.UUID))
 	err := du.Rename(exampleVolumeInfo, "newname")
 	if err := fakecmd.AsHelperProcessErr(err); err != nil {
 		t.Fatal(err)
@@ -435,11 +381,11 @@ func TestRename_IDsVolumesByUUID(t *testing.T) {
 }
 
 func TestRename_Errors(t *testing.T) {
-	fakeCmdOpts := fakecmd.Options{
-		Stderrs:   map[string]string{"diskutil": "example stderr"},
-		ExitFails: map[string]bool{"diskutil": true},
+	opts := []fakecmd.Option{
+		fakecmd.Stderr("diskutil", "example stderr"),
+		fakecmd.ExitFail("diskutil"),
 	}
-	du := newWithFakeCmd(t, fakeCmdOpts)
+	du := newWithFakeCmd(t, opts...)
 	err := du.Rename(exampleVolumeInfo, "newname")
 	if err := fakecmd.AsHelperProcessErr(err); err != nil {
 		t.Fatal(err)
@@ -451,7 +397,7 @@ func TestRename_Errors(t *testing.T) {
 }
 
 func TestDeleteSnapshot(t *testing.T) {
-	du := newWithFakeCmd(t, fakecmd.Options{})
+	du := newWithFakeCmd(t)
 	err := du.DeleteSnapshot(exampleVolumeInfo, Snapshot{
 		Name: "example-snapshot",
 		UUID: "example-snapshot-uuid",
@@ -465,13 +411,7 @@ func TestDeleteSnapshot(t *testing.T) {
 }
 
 func TestDeleteSnapshot_IDsVolumesByUUID(t *testing.T) {
-	du := newWithFakeCmd(t, fakecmd.Options{
-			WantArgs: map[string]map[string]bool{
-				"diskutil": map[string]bool{
-					exampleVolumeInfo.UUID: true,
-				},
-			},
-	})
+	du := newWithFakeCmd(t, fakecmd.WantArg("diskutil", exampleVolumeInfo.UUID))
 	err := du.DeleteSnapshot(exampleVolumeInfo, Snapshot{
 		Name: "example-snapshot",
 		UUID: "example-snapshot-uuid",
@@ -485,11 +425,11 @@ func TestDeleteSnapshot_IDsVolumesByUUID(t *testing.T) {
 }
 
 func TestDeleteSnapshot_Errors(t *testing.T) {
-	fakeCmdOpts := fakecmd.Options{
-		Stderrs:   map[string]string{"diskutil": "example stderr"},
-		ExitFails: map[string]bool{"diskutil": true},
+	opts := []fakecmd.Option{
+		fakecmd.Stderr("diskutil", "example stderr"),
+		fakecmd.ExitFail("diskutil"),
 	}
-	du := newWithFakeCmd(t, fakeCmdOpts)
+	du := newWithFakeCmd(t, opts...)
 	err := du.DeleteSnapshot(exampleVolumeInfo, Snapshot{
 		Name: "example-snapshot",
 		UUID: "example-snapshot-uuid",
