@@ -50,7 +50,7 @@ func TestRestore_WritesOutputToStdout(t *testing.T) {
 }
 
 // Test that Restore:
-//   1. IDs volumes by MountPoint.
+//   1. IDs volumes by device node.
 //   2. IDs snapshots by UUID.
 func TestRestore_CmdArgs(t *testing.T) {
 	source := diskutil.VolumeInfo{
@@ -78,10 +78,10 @@ func TestRestore_CmdArgs(t *testing.T) {
 	a.execCommand = fakecmd.FakeCommand(t, fakecmd.Options{
 		WantArgs: map[string]map[string]bool{
 			"asr": map[string]bool{
-				source.MountPoint: true,
-				target.MountPoint: true,
-				to.UUID:           true,
-				from.UUID:         true,
+				source.Device: true,
+				target.Device: true,
+				to.UUID:       true,
+				from.UUID:     true,
 			},
 		},
 	})
