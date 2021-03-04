@@ -32,7 +32,7 @@ func TestRestore(t *testing.T) {
 	}
 
 	du := diskutil.New()
-	got, err := du.ListSnapshots(target.UUID)
+	got, err := du.ListSnapshots(target)
 	if err != nil {
 		t.Fatal(err)
 	}

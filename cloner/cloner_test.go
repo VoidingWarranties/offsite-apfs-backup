@@ -124,11 +124,19 @@ func TestClone(t *testing.T) {
 				t.Fatalf("Clone(...) returned unexpected error: %q, want: nil", err)
 			}
 
-			gotSourceSnaps, err := du.ListSnapshots(test.source)
+			sourceInfo, err := du.Info(test.source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			targetInfo, err := du.Info(test.target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			gotSourceSnaps, err := du.ListSnapshots(sourceInfo)
 			if err != nil {
 				t.Fatalf("error listing snapshots: %v", err)
 			}
-			gotTargetSnaps, err := du.ListSnapshots(test.target)
+			gotTargetSnaps, err := du.ListSnapshots(targetInfo)
 			if err != nil {
 				t.Fatalf("error listing snapshots: %v", err)
 			}

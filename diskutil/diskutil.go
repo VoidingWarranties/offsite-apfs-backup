@@ -43,19 +43,6 @@ func New(opts ...Option) DiskUtil {
 	return du
 }
 
-func (du DiskUtil) Rename(volume string, name string) error {
-	cmd := du.execCommand("diskutil", "rename", volume, name)
-	cmd.Stdout = os.Stdout
-	stderr := new(bytes.Buffer)
-	cmd.Stderr = stderr
-
-	log.Printf("Running command:\n%s", cmd)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("`%s` failed (%w) with stderr: %s", cmd, err, stderr)
-	}
-	return nil
-}
-
 type VolumeInfo struct {
 	UUID       string `json:"VolumeUUID"`
 	Name       string `json:"VolumeName"`
@@ -70,6 +57,19 @@ func (du DiskUtil) Info(volume string) (VolumeInfo, error) {
 	return info, err
 }
 
+func (du DiskUtil) Rename(volume VolumeInfo, name string) error {
+	cmd := du.execCommand("diskutil", "rename", volume.UUID, name)
+	cmd.Stdout = os.Stdout
+	stderr := new(bytes.Buffer)
+	cmd.Stderr = stderr
+
+	log.Printf("Running command:\n%s", cmd)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("`%s` failed (%w) with stderr: %s", cmd, err, stderr)
+	}
+	return nil
+}
+
 type Snapshot struct {
 	Name    string    `json:"SnapshotName"`
 	UUID    string    `json:"SnapshotUUID"`
@@ -80,8 +80,8 @@ func (s Snapshot) String() string {
 	return fmt.Sprintf("%s (%s)", s.Name, s.UUID)
 }
 
-func (du DiskUtil) ListSnapshots(volume string) ([]Snapshot, error) {
-	cmd := du.execCommand("diskutil", "apfs", "listsnapshots", "-plist", volume)
+func (du DiskUtil) ListSnapshots(volume VolumeInfo) ([]Snapshot, error) {
+	cmd := du.execCommand("diskutil", "apfs", "listsnapshots", "-plist", volume.UUID)
 	var snapshotList struct {
 		Snapshots []Snapshot `json:"Snapshots"`
 	}
@@ -137,8 +137,8 @@ func parseTimeFromSnapshotName(name string) (time.Time, error) {
 	return created, nil
 }
 
-func (du DiskUtil) DeleteSnapshot(volume string, snap Snapshot) error {
-	cmd := du.execCommand("diskutil", "apfs", "deletesnapshot", volume, "-uuid", snap.UUID)
+func (du DiskUtil) DeleteSnapshot(volume VolumeInfo, snap Snapshot) error {
+	cmd := du.execCommand("diskutil", "apfs", "deletesnapshot", volume.UUID, "-uuid", snap.UUID)
 	cmd.Stdout = os.Stdout
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr

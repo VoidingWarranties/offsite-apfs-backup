@@ -49,9 +49,9 @@ type Cloner struct {
 
 type du interface {
 	Info(volume string) (diskutil.VolumeInfo, error)
-	Rename(volume string, name string) error
-	ListSnapshots(volume string) ([]diskutil.Snapshot, error)
-	DeleteSnapshot(volume string, snap diskutil.Snapshot) error
+	Rename(volume diskutil.VolumeInfo, name string) error
+	ListSnapshots(volume diskutil.VolumeInfo) ([]diskutil.Snapshot, error)
+	DeleteSnapshot(volume diskutil.VolumeInfo, snap diskutil.Snapshot) error
 }
 
 type restorer interface {
@@ -70,11 +70,11 @@ func (c Cloner) Clone(source, target string) error {
 		return fmt.Errorf("error getting volume info of target %q: %v", target, err)
 	}
 
-	sourceSnaps, err := c.diskutil.ListSnapshots(sourceInfo.UUID)
+	sourceSnaps, err := c.diskutil.ListSnapshots(sourceInfo)
 	if err != nil {
 		return fmt.Errorf("error listing snapshots of source %q: %v", source, err)
 	}
-	targetSnaps, err := c.diskutil.ListSnapshots(targetInfo.UUID)
+	targetSnaps, err := c.diskutil.ListSnapshots(targetInfo)
 	if err != nil {
 		return fmt.Errorf("error listing snapshots of target %q: %v", target, err)
 	}
@@ -90,13 +90,13 @@ func (c Cloner) Clone(source, target string) error {
 	if err := c.asr.Restore(sourceInfo, targetInfo, latestSourceSnap, commonSnap); err != nil {
 		return fmt.Errorf("error restoring: %v", err)
 	}
-	if err := c.diskutil.Rename(targetInfo.UUID, targetInfo.Name); err != nil {
+	if err := c.diskutil.Rename(targetInfo, targetInfo.Name); err != nil {
 		return fmt.Errorf("error renaming volume to original name: %v", err)
 	}
 
 	if c.prune {
 		log.Print("Pruning common snapshot from target...")
-		if err := c.diskutil.DeleteSnapshot(targetInfo.UUID, commonSnap); err != nil {
+		if err := c.diskutil.DeleteSnapshot(targetInfo, commonSnap); err != nil {
 			return fmt.Errorf("error deleting snapshot %q from target", commonSnap)
 		}
 	}

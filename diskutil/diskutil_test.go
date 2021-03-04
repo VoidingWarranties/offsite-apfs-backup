@@ -179,6 +179,15 @@ func TestInfo_Errors(t *testing.T) {
 	}
 }
 
+var (
+	exampleVolumeInfo = VolumeInfo{
+		Name:       "Example Volume",
+		UUID:       "example-volume-uuid",
+		MountPoint: "/example/volume",
+		Device:     "/dev/example-volume",
+	}
+)
+
 func TestListSnapshots(t *testing.T) {
 	tests := []struct{
 		name       string
@@ -251,7 +260,7 @@ func TestListSnapshots(t *testing.T) {
 				WantStdins: test.wantStdins,
 			}
 			du := newWithFakeCmd(t, fakeCmdOpts)
-			got, err := du.ListSnapshots("/example/volume")
+			got, err := du.ListSnapshots(exampleVolumeInfo)
 			if err := fakecmd.AsHelperProcessErr(err); err != nil {
 				t.Fatal(err)
 			}
@@ -364,7 +373,7 @@ func TestListSnapshots_Errors(t *testing.T) {
 				ExitFails:  test.exitFails,
 			}
 			du := newWithFakeCmd(t, fakeCmdOpts)
-			_, err := du.ListSnapshots("/example/volume")
+			_, err := du.ListSnapshots(exampleVolumeInfo)
 			if err := fakecmd.AsHelperProcessErr(err); err != nil {
 				t.Fatal(err)
 			}
@@ -377,7 +386,7 @@ func TestListSnapshots_Errors(t *testing.T) {
 
 func TestRename(t *testing.T) {
 	du := newWithFakeCmd(t, fakecmd.Options{})
-	err := du.Rename("/example/volume", "newname")
+	err := du.Rename(exampleVolumeInfo, "newname")
 	if err := fakecmd.AsHelperProcessErr(err); err != nil {
 		t.Fatal(err)
 	}
@@ -392,7 +401,7 @@ func TestRename_Errors(t *testing.T) {
 		ExitFails: map[string]bool{"diskutil": true},
 	}
 	du := newWithFakeCmd(t, fakeCmdOpts)
-	err := du.Rename("/example/volume", "newname")
+	err := du.Rename(exampleVolumeInfo, "newname")
 	if err := fakecmd.AsHelperProcessErr(err); err != nil {
 		t.Fatal(err)
 	}
@@ -404,7 +413,7 @@ func TestRename_Errors(t *testing.T) {
 
 func TestDeleteSnapshot(t *testing.T) {
 	du := newWithFakeCmd(t, fakecmd.Options{})
-	err := du.DeleteSnapshot("/example/volume", Snapshot{
+	err := du.DeleteSnapshot(exampleVolumeInfo, Snapshot{
 		Name: "example-snapshot",
 		UUID: "example-snapshot-uuid",
 	})
@@ -422,7 +431,7 @@ func TestDeleteSnapshot_Errors(t *testing.T) {
 		ExitFails: map[string]bool{"diskutil": true},
 	}
 	du := newWithFakeCmd(t, fakeCmdOpts)
-	err := du.DeleteSnapshot("/example/volume", Snapshot{
+	err := du.DeleteSnapshot(exampleVolumeInfo, Snapshot{
 		Name: "example-snapshot",
 		UUID: "example-snapshot-uuid",
 	})
