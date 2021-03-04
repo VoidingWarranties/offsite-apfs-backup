@@ -24,6 +24,7 @@ func New() ASR {
 }
 
 func (a ASR) Restore(source, target diskutil.VolumeInfo, to, from diskutil.Snapshot) error {
+	// TODO: ID volumes by Device instead of MountPoint.
 	cmd := a.execCommand(
 		"asr", "restore",
 		"--source", source.MountPoint,

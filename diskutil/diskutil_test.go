@@ -284,9 +284,9 @@ func TestListSnapshots_IDsVolumesByUUID(t *testing.T) {
 					"Snapshots": []
 				}`,
 			},
-			WantArgs: map[string]map[string]string{
-				"diskutil": map[string]string{
-					exampleVolumeInfo.UUID: "",
+			WantArgs: map[string]map[string]bool{
+				"diskutil": map[string]bool{
+					exampleVolumeInfo.UUID: true,
 				},
 			},
 	})
@@ -419,9 +419,9 @@ func TestRename(t *testing.T) {
 
 func TestRename_IDsVolumesByUUID(t *testing.T) {
 	du := newWithFakeCmd(t, fakecmd.Options{
-			WantArgs: map[string]map[string]string{
-				"diskutil": map[string]string{
-					exampleVolumeInfo.UUID: "",
+			WantArgs: map[string]map[string]bool{
+				"diskutil": map[string]bool{
+					exampleVolumeInfo.UUID: true,
 				},
 			},
 	})
@@ -466,9 +466,9 @@ func TestDeleteSnapshot(t *testing.T) {
 
 func TestDeleteSnapshot_IDsVolumesByUUID(t *testing.T) {
 	du := newWithFakeCmd(t, fakecmd.Options{
-			WantArgs: map[string]map[string]string{
-				"diskutil": map[string]string{
-					exampleVolumeInfo.UUID: "",
+			WantArgs: map[string]map[string]bool{
+				"diskutil": map[string]bool{
+					exampleVolumeInfo.UUID: true,
 				},
 			},
 	})
