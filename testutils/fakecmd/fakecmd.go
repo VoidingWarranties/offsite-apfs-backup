@@ -75,7 +75,7 @@ type Options struct {
 	// If true, the command will exit with exit code 1.
 	ExitFails map[string]bool
 	// TODO: document.
-	WantArgs map[string]map[string]string
+	WantArgs map[string]map[string]bool
 }
 
 // FakeCommand returns a function suitable for replacing a call to
@@ -100,33 +100,14 @@ func FakeCommand(t *testing.T, opt Options) func(string, ...string) *exec.Cmd {
 	}
 }
 
-func validateArgs(t *testing.T, name string, want map[string]string, got []string) {
-	// TODO: this is O(n^2). Is there a better algorithm?
-	//
-	// TODO: this algorithm will not error if there are overlapping
-	//       matches. Is there an efficient algorithm for finding if `got`
-	//       contains all non-overlapping key-value pairs in `want`?
-	for wantArg, wantVal := range want {
-		foundArg := false
-		for i, gotArg := range got {
-			if gotArg != wantArg {
-				continue
-			}
-			foundArg = true
-			if wantVal == "" {
-				break
-			}
-			var gotVal string
-			if i+1 < len(got) {
-				gotVal = got[i+1]
-			}
-			if gotVal != wantVal {
-				t.Errorf("expected %q to be called with arg %s=%s, but got %s=%s", name, wantArg, wantVal, wantArg, gotVal)
-			}
-			break
-		}
-		if !foundArg {
-			t.Errorf("expected %q to be called with arg %s=%s", name, wantArg, wantVal)
+func validateArgs(t *testing.T, name string, want map[string]bool, got []string) {
+	gotArgSet := make(map[string]bool)
+	for _, arg := range got {
+		gotArgSet[arg] = true
+	}
+	for arg := range want {
+		if !gotArgSet[arg] {
+			t.Errorf("expected %q to be called with arg %q", name, arg)
 		}
 	}
 }
