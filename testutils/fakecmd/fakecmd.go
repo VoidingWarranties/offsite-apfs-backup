@@ -63,18 +63,18 @@ import (
 )
 
 // Options defines the behaviors of commands faked by FakeCommand. All keys in
-// the maps are command names.
+// the top-level maps are command names.
 type Options struct {
 	// Value to output to stdout.
 	Stdouts map[string]string
 	// Value to output to stderr.
 	Stderrs map[string]string
+	// If true, the command will exit with exit code 1.
+	ExitFails map[string]bool
 	// Value expected by stdin. If another value is received, the helper
 	// process exits in such a way that AsHelperProcessErr returns non-nil.
 	WantStdins map[string]string
-	// If true, the command will exit with exit code 1.
-	ExitFails map[string]bool
-	// TODO: document.
+	// Set of args the command is expected to be called with.
 	WantArgs map[string]map[string]bool
 }
 
