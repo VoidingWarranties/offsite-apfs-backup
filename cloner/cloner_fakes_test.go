@@ -101,44 +101,32 @@ func (du *fakeDiskUtil) Info(volume string) (diskutil.VolumeInfo, error) {
 	return du.devices.Volume(volume)
 }
 
-func (du *fakeDiskUtil) Rename(volume string, name string) error {
-	info, err := du.devices.Volume(volume)
-	if err != nil {
-		return err
-	}
-	snaps, err := du.devices.Snapshots(info.UUID)
+func (du *fakeDiskUtil) Rename(volume diskutil.VolumeInfo, name string) error {
+	snaps, err := du.devices.Snapshots(volume.UUID)
 	if err != nil {
 		return err
 	}
 
-	if err := du.devices.RemoveVolume(info.UUID); err != nil {
+	if err := du.devices.RemoveVolume(volume.UUID); err != nil {
 		return err
 	}
-	info.Name = name
-	return du.devices.AddVolume(info, snaps...)
+	volume.Name = name
+	return du.devices.AddVolume(volume, snaps...)
 }
 
-func (du *fakeDiskUtil) ListSnapshots(volume string) ([]diskutil.Snapshot, error) {
-	info, err := du.devices.Volume(volume)
-	if err != nil {
-		return nil, err
-	}
-	return du.devices.Snapshots(info.UUID)
+func (du *fakeDiskUtil) ListSnapshots(volume diskutil.VolumeInfo) ([]diskutil.Snapshot, error) {
+	return du.devices.Snapshots(volume.UUID)
 }
 
-func (du *fakeDiskUtil) DeleteSnapshot(volume string, snap diskutil.Snapshot) error {
-	info, err := du.devices.Volume(volume)
-	if err != nil {
-		return err
-	}
-	return du.devices.DeleteSnapshot(info.UUID, snap.UUID)
+func (du *fakeDiskUtil) DeleteSnapshot(volume diskutil.VolumeInfo, snap diskutil.Snapshot) error {
+	return du.devices.DeleteSnapshot(volume.UUID, snap.UUID)
 }
 
 type DiskUtil interface {
 	Info(volume string) (diskutil.VolumeInfo, error)
-	Rename(volume string, name string) error
-	ListSnapshots(volume string) ([]diskutil.Snapshot, error)
-	DeleteSnapshot(volume string, snap diskutil.Snapshot) error
+	Rename(volume diskutil.VolumeInfo, name string) error
+	ListSnapshots(volume diskutil.VolumeInfo) ([]diskutil.Snapshot, error)
+	DeleteSnapshot(volume diskutil.VolumeInfo, snap diskutil.Snapshot) error
 }
 
 type readonlyFakeDiskUtil struct {
@@ -151,7 +139,7 @@ func (du *readonlyFakeDiskUtil) Info(volume string) (diskutil.VolumeInfo, error)
 	return du.du.Info(volume)
 }
 
-func (du *readonlyFakeDiskUtil) ListSnapshots(volume string) ([]diskutil.Snapshot, error) {
+func (du *readonlyFakeDiskUtil) ListSnapshots(volume diskutil.VolumeInfo) ([]diskutil.Snapshot, error) {
 	return du.du.ListSnapshots(volume)
 }
 

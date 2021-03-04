@@ -16,6 +16,13 @@ var (
 	img      = filepath.Join("../testutils/diskimage", diskimage.SourceImg)
 	imgInfo  = diskimage.SourceInfo
 	imgSnaps = diskimage.SourceSnaps
+
+	nonexistentVolume = diskutil.VolumeInfo{
+		Name:       "Not A Volume",
+		UUID:       "not-a-volume-uuid",
+		MountPoint: "/not/a/volume",
+		Device:     "/dev/not-a-volume-device",
+	}
 )
 
 func TestInfo(t *testing.T) {
@@ -42,9 +49,9 @@ func TestInfo_Errors(t *testing.T) {
 }
 
 func TestListSnapshots(t *testing.T) {
-	mountpoint, _ := diskimage.MountRO(t, img)
+	diskimage.MountRO(t, img)
 	du := diskutil.New()
-	got, err := du.ListSnapshots(mountpoint)
+	got, err := du.ListSnapshots(imgInfo)
 	if err != nil {
 		t.Fatalf("ListSnapshots returned unexpected error: %v, want: nil", err)
 	}
@@ -56,7 +63,7 @@ func TestListSnapshots(t *testing.T) {
 
 func TestListSnapshots_Error(t *testing.T) {
 	du := diskutil.New()
-	_, err := du.ListSnapshots(t.TempDir())
+	_, err := du.ListSnapshots(nonexistentVolume)
 	if err == nil {
 		t.Fatal("ListSnapshots returned unexpected error: nil, want: non-nil", err)
 	}
@@ -65,7 +72,7 @@ func TestListSnapshots_Error(t *testing.T) {
 func TestRename(t *testing.T) {
 	mountpoint, device := diskimage.MountRW(t, img)
 	du := diskutil.New()
-	if err := du.Rename(device, "newname"); err != nil {
+	if err := du.Rename(imgInfo, "newname"); err != nil {
 		t.Fatalf("Rename returned unexpected error: %v, want: nil", err)
 	}
 	got, err := du.Info(device)
@@ -83,20 +90,20 @@ func TestRename(t *testing.T) {
 
 func TestRename_Errors(t *testing.T) {
 	du := diskutil.New()
-	err := du.Rename(t.TempDir(), "newname")
+	err := du.Rename(nonexistentVolume, "newname")
 	if err == nil {
 		t.Fatal("Rename returned unexpected error: nil, want: non-nil")
 	}
 }
 
 func TestDeleteSnapshot(t *testing.T) {
-	mountpoint, _ := diskimage.MountRW(t, img)
+	diskimage.MountRW(t, img)
 	du := diskutil.New()
-	err := du.DeleteSnapshot(mountpoint, imgSnaps[1])
+	err := du.DeleteSnapshot(imgInfo, imgSnaps[1])
 	if err != nil {
 		t.Fatalf("DeleteSnapshot returned unexpected error: %v, want: nil", err)
 	}
-	got, err := du.ListSnapshots(mountpoint)
+	got, err := du.ListSnapshots(imgInfo)
 	if err != nil {
 		t.Fatalf("ListSnapshots returned unexpected error: %v, want: nil", err)
 	}
@@ -105,11 +112,11 @@ func TestDeleteSnapshot(t *testing.T) {
 		t.Errorf("DeleteSnapshot resulted in unexpected snapshots. -want +got:\n%s", diff)
 	}
 
-	err = du.DeleteSnapshot(mountpoint, imgSnaps[0])
+	err = du.DeleteSnapshot(imgInfo, imgSnaps[0])
 	if err != nil {
 		t.Fatalf("DeleteSnapshot returned unexpected error: %v, want: nil", err)
 	}
-	got, err = du.ListSnapshots(mountpoint)
+	got, err = du.ListSnapshots(imgInfo)
 	if err != nil {
 		t.Fatalf("ListSnapshots returned unexpected error: %v, want: nil", err)
 	}
@@ -122,22 +129,21 @@ func TestDeleteSnapshot(t *testing.T) {
 func TestDeleteSnapshot_Errors(t *testing.T) {
 	tests := []struct{
 		name  string
-		setup func(*testing.T) (mountpoint string)
+		setup func(*testing.T)
+		info  diskutil.VolumeInfo
 		snap  diskutil.Snapshot
 	}{
 		{
 			name: "volume not found",
-			setup: func(t *testing.T) string {
-				return t.TempDir()
-			},
+			info: nonexistentVolume,
 			snap: imgSnaps[1],
 		},
 		{
 			name: "snapshot not found",
-			setup: func(t *testing.T) string {
-				mountpoint, _ := diskimage.MountRW(t, img)
-				return mountpoint
+			setup: func(t *testing.T) {
+				diskimage.MountRW(t, img)
 			},
+			info: imgInfo,
 			snap: diskutil.Snapshot{
 				Name: "not-a-snapshot",
 				UUID: "not-a-snapshot-uuid",
@@ -145,18 +151,20 @@ func TestDeleteSnapshot_Errors(t *testing.T) {
 		},
 		{
 			name: "readonly volume",
-			setup: func(t *testing.T) string {
-				mountpoint, _ := diskimage.MountRO(t, img)
-				return mountpoint
+			setup: func(t *testing.T) {
+				diskimage.MountRO(t, img)
 			},
+			info: imgInfo,
 			snap: imgSnaps[1],
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			mountpoint := test.setup(t)
+			if test.setup != nil {
+				test.setup(t)
+			}
 			du := diskutil.New()
-			err := du.DeleteSnapshot(mountpoint, test.snap)
+			err := du.DeleteSnapshot(test.info, test.snap)
 			if err == nil {
 				t.Fatal("DeleteSnapshot returned unexpected error: nil, want: non-nil")
 			}

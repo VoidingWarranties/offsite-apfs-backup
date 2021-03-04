@@ -75,7 +75,7 @@ func TestClone(t *testing.T) {
 				t.Errorf("Clone resulted in unexpected target VolumeInfo. -want +got:\n%s", diff)
 			}
 
-			gotTargetSnaps, err := du.ListSnapshots(target)
+			gotTargetSnaps, err := du.ListSnapshots(gotTargetInfo)
 			if err != nil {
 				t.Fatal(err)
 			}
