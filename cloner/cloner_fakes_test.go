@@ -134,6 +134,27 @@ func (du *fakeDiskUtil) DeleteSnapshot(volume string, snap diskutil.Snapshot) er
 	return du.devices.DeleteSnapshot(info.UUID, snap.UUID)
 }
 
+type DiskUtil interface {
+	Info(volume string) (diskutil.VolumeInfo, error)
+	Rename(volume string, name string) error
+	ListSnapshots(volume string) ([]diskutil.Snapshot, error)
+	DeleteSnapshot(volume string, snap diskutil.Snapshot) error
+}
+
+type readonlyFakeDiskUtil struct {
+	du *fakeDiskUtil
+
+	DiskUtil
+}
+
+func (du *readonlyFakeDiskUtil) Info(volume string) (diskutil.VolumeInfo, error) {
+	return du.du.Info(volume)
+}
+
+func (du *readonlyFakeDiskUtil) ListSnapshots(volume string) ([]diskutil.Snapshot, error) {
+	return du.du.ListSnapshots(volume)
+}
+
 type fakeASR struct {
 	devices *fakeDevices
 }

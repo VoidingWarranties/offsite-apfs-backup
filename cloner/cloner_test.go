@@ -145,27 +145,6 @@ func TestClone(t *testing.T) {
 	}
 }
 
-type DiskUtil interface {
-	Info(volume string) (diskutil.VolumeInfo, error)
-	Rename(volume string, name string) error
-	ListSnapshots(volume string) ([]diskutil.Snapshot, error)
-	DeleteSnapshot(volume string, snap diskutil.Snapshot) error
-}
-
-type readonlyFakeDiskUtil struct {
-	du *fakeDiskUtil
-
-	DiskUtil
-}
-
-func (du *readonlyFakeDiskUtil) Info(volume string) (diskutil.VolumeInfo, error) {
-	return du.du.Info(volume)
-}
-
-func (du *readonlyFakeDiskUtil) ListSnapshots(volume string) ([]diskutil.Snapshot, error) {
-	return du.du.ListSnapshots(volume)
-}
-
 func TestClone_Errors(t *testing.T) {
 	snap1 := diskutil.Snapshot{
 		Name:    "common-snap",
