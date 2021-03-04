@@ -114,8 +114,8 @@ func TestClone(t *testing.T) {
 			du := &fakeDiskUtil{&d}
 			test.setup(t, &d)
 			opts := append([]Option{
-				WithDiskUtil(du),
-				WithASR(&fakeASR{&d}),
+				withDiskUtil(du),
+				withASR(&fakeASR{&d}),
 			}, test.opts...)
 			c := New(opts...)
 			if err := c.Clone(test.source, test.target); err != nil {
@@ -298,11 +298,11 @@ func TestClone_Errors(t *testing.T) {
 			test.setup(t, &d)
 			opts := []Option{
 				// readonly so that test panics if any modifying methods are called.
-				WithDiskUtil(&readonlyFakeDiskUtil{
+				withDiskUtil(&readonlyFakeDiskUtil{
 					du: &fakeDiskUtil{&d},
 				}),
 				// nil so that test panics if asr is called.
-				WithASR(nil),
+				withASR(nil),
 			}
 			c := New(opts...)
 			if err := c.Clone(test.source, test.target); err == nil {

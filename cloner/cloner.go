@@ -1,3 +1,4 @@
+// Package cloner implements cloning APFS volumes using APFS snapshot diffs.
 package cloner
 
 import (
@@ -9,26 +10,30 @@ import (
 	"apfs-snapshot-diff-clone/diskutil"
 )
 
+// Option configures Cloner.
 type Option func(*Cloner)
 
+// Prune, if true, deletes the snapshot that source and target had in common
+// iff a clone is completed successfully.
 func Prune(prune bool) Option {
 	return func(c *Cloner) {
 		c.prune = prune
 	}
 }
 
-func WithDiskUtil(du du) Option {
+func withDiskUtil(du du) Option {
 	return func(c *Cloner) {
 		c.diskutil = du
 	}
 }
 
-func WithASR(r restorer) Option {
+func withASR(r restorer) Option {
 	return func(c *Cloner) {
 		c.asr = r
 	}
 }
 
+// New returns a new Cloner with the given options.
 func New(opts ...Option) Cloner {
 	c := Cloner {
 		diskutil: diskutil.New(),
@@ -40,6 +45,7 @@ func New(opts ...Option) Cloner {
 	return c
 }
 
+// Cloner clones APFS volumes using APFS snapshot diffs.
 type Cloner struct {
 	diskutil du
 	asr      restorer
@@ -58,6 +64,8 @@ type restorer interface {
 	Restore(source, target diskutil.VolumeInfo, to, from diskutil.Snapshot) error
 }
 
+// Clone the latest snapshot in source to target, from the most recent common
+// snapshot present in both source and target.
 func (c Cloner) Clone(source, target string) error {
 	log.Printf("Cloning %q to %q...", source, target)
 
