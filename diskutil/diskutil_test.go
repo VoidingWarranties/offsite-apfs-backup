@@ -22,8 +22,8 @@ func newWithFakeCmd(t *testing.T, opts ...fakecmd.Option) DiskUtil {
 	execCmd := fakecmd.FakeCommand(t, opts...)
 	pl := plutil.New(plutil.WithExecCommand(execCmd))
 	return New(
-		WithExecCommand(execCmd),
-		WithPLUtil(pl),
+		withExecCommand(execCmd),
+		withPLUtil(pl),
 	)
 }
 

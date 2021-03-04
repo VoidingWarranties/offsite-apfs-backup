@@ -1,3 +1,5 @@
+// Package diskutil implements reading metadata of, and some modifications to,
+// local volumes using MacOS's diskutil.
 package diskutil
 
 import (
@@ -13,26 +15,28 @@ import (
 	"apfs-snapshot-diff-clone/plutil"
 )
 
+// DiskUtil reads and modifies metadata of local volumes.
 type DiskUtil struct {
 	execCommand func(string, ...string) *exec.Cmd
 	pl          plutil.PLUtil
 }
 
-type Option func(*DiskUtil)
+type option func(*DiskUtil)
 
-func WithExecCommand(f func(string, ...string) *exec.Cmd) Option {
+func withExecCommand(f func(string, ...string) *exec.Cmd) option {
 	return func(du *DiskUtil) {
 		du.execCommand = f
 	}
 }
 
-func WithPLUtil(pl plutil.PLUtil) Option {
+func withPLUtil(pl plutil.PLUtil) option {
 	return func(du *DiskUtil) {
 		du.pl = pl
 	}
 }
 
-func New(opts ...Option) DiskUtil {
+// New returns a new DiskUtil.
+func New(opts ...option) DiskUtil {
 	du := DiskUtil{
 		execCommand: exec.Command,
 		pl:          plutil.New(),
@@ -43,6 +47,8 @@ func New(opts ...Option) DiskUtil {
 	return du
 }
 
+// VolumeInfo describes a local volume. Typically used to identify a volume by
+// UUID, mount point, or device node.
 type VolumeInfo struct {
 	UUID       string `json:"VolumeUUID"`
 	Name       string `json:"VolumeName"`
@@ -50,6 +56,8 @@ type VolumeInfo struct {
 	Device     string `json:"DeviceNode"`
 }
 
+// Info returns the VolumeInfo of volume. Volume may be a volume name, UUID,
+// mount point, or device node.
 func (du DiskUtil) Info(volume string) (VolumeInfo, error) {
 	cmd := du.execCommand("diskutil", "info", "-plist", volume)
 	var info VolumeInfo
@@ -57,6 +65,7 @@ func (du DiskUtil) Info(volume string) (VolumeInfo, error) {
 	return info, err
 }
 
+// Rename volume to name.
 func (du DiskUtil) Rename(volume VolumeInfo, name string) error {
 	cmd := du.execCommand("diskutil", "rename", volume.UUID, name)
 	cmd.Stdout = os.Stdout
@@ -70,6 +79,7 @@ func (du DiskUtil) Rename(volume VolumeInfo, name string) error {
 	return nil
 }
 
+// Snapshot describes an APFS volume's snapshot.
 type Snapshot struct {
 	Name    string    `json:"SnapshotName"`
 	UUID    string    `json:"SnapshotUUID"`
@@ -80,6 +90,9 @@ func (s Snapshot) String() string {
 	return fmt.Sprintf("%s (%s)", s.Name, s.UUID)
 }
 
+// ListSnapshots returns a volume's APFS snapshots. The snapshots are returned
+// in the order of most recent snapshot first. Note that this is the reverse of
+// the order returned by 'diskutil apfs listsnapshots`.
 func (du DiskUtil) ListSnapshots(volume VolumeInfo) ([]Snapshot, error) {
 	cmd := du.execCommand("diskutil", "apfs", "listsnapshots", "-plist", volume.UUID)
 	var snapshotList struct {
@@ -137,6 +150,7 @@ func parseTimeFromSnapshotName(name string) (time.Time, error) {
 	return created, nil
 }
 
+// DeleteSnapshot removes the given snapshot from the given volume.
 func (du DiskUtil) DeleteSnapshot(volume VolumeInfo, snap Snapshot) error {
 	cmd := du.execCommand("diskutil", "apfs", "deletesnapshot", volume.UUID, "-uuid", snap.UUID)
 	cmd.Stdout = os.Stdout
