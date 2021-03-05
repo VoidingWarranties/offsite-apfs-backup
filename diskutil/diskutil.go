@@ -54,6 +54,8 @@ type VolumeInfo struct {
 	Name       string `json:"VolumeName"`
 	MountPoint string `json:"MountPoint"`
 	Device     string `json:"DeviceNode"`
+	Writable   bool   `json:"WritableVolume"`
+	FileSystem string `json:"FilesystemType"`
 }
 
 // Info returns the VolumeInfo of volume. Volume may be a volume name, UUID,

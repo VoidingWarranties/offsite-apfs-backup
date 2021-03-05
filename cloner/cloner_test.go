@@ -10,6 +10,149 @@ import (
 	"apfs-snapshot-diff-clone/diskutil"
 )
 
+func TestCloneableSource(t *testing.T) {
+	d := &fakeDevices{
+		volumes:   make(map[string]diskutil.VolumeInfo),
+		snapshots: make(map[string][]diskutil.Snapshot),
+	}
+	d.AddVolume(diskutil.VolumeInfo{
+		Name:       "foo-name",
+		UUID:       "123-foo-uuid",
+		MountPoint: "/foo/mount/point",
+		FileSystem: "apfs",
+	})
+	du := &fakeDiskUtil{d}
+	c := New(withDiskUtil(&readonlyFakeDiskUtil{du: du}))
+	if err := c.CloneableSource("/foo/mount/point"); err != nil {
+		t.Errorf("CloneableSource returned error: %q, want: nil", err)
+	}
+}
+
+func TestCloneableSource_Errors(t *testing.T) {
+	tests := []struct{
+		name   string
+		setup  func(*testing.T, *fakeDevices)
+		source string
+	}{
+		{
+			name:   "not a device",
+			setup:  func(*testing.T, *fakeDevices) {},
+			source: "not-a-volume-uuid",
+		},
+		{
+			name: "not not an APFS volume",
+			setup: func(t *testing.T, d *fakeDevices) {
+				err := d.AddVolume(diskutil.VolumeInfo{
+					Name:       "HFS Volume",
+					UUID:       "hfs-volume-uuid",
+					MountPoint: "/hfs/volume/mount/point",
+					Device:     "/dev/hfs-device",
+					FileSystem: "hfs",
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+			},
+			source: "/hfs/volume/mount/point",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			d := &fakeDevices{
+				volumes:   make(map[string]diskutil.VolumeInfo),
+				snapshots: make(map[string][]diskutil.Snapshot),
+			}
+			test.setup(t, d)
+			du := &fakeDiskUtil{d}
+			c := New(withDiskUtil(&readonlyFakeDiskUtil{du: du}))
+			if err := c.CloneableSource(test.source); err == nil {
+				t.Error("CloneableSource returnd error: nil, want: non-nil")
+			}
+		})
+	}
+}
+
+func TestCloneableTarget(t *testing.T) {
+	d := &fakeDevices{
+		volumes:   make(map[string]diskutil.VolumeInfo),
+		snapshots: make(map[string][]diskutil.Snapshot),
+	}
+	d.AddVolume(diskutil.VolumeInfo{
+		Name:       "foo-name",
+		UUID:       "123-foo-uuid",
+		MountPoint: "/foo/mount/point",
+		FileSystem: "apfs",
+		Writable:   true,
+	})
+	du := &fakeDiskUtil{d}
+	c := New(withDiskUtil(&readonlyFakeDiskUtil{du: du}))
+	if err := c.CloneableTarget("/foo/mount/point"); err != nil {
+		t.Errorf("CloneableTarget returned error: %q, want: nil", err)
+	}
+}
+
+func TestCloneableTarget_Errors(t *testing.T) {
+	tests := []struct{
+		name   string
+		setup  func(*testing.T, *fakeDevices)
+		source string
+	}{
+		{
+			name:   "not a device",
+			setup:  func(*testing.T, *fakeDevices) {},
+			source: "not-a-volume-uuid",
+		},
+		{
+			name: "not not an APFS volume",
+			setup: func(t *testing.T, d *fakeDevices) {
+				err := d.AddVolume(diskutil.VolumeInfo{
+					Name:       "HFS Volume",
+					UUID:       "hfs-volume-uuid",
+					MountPoint: "/hfs/volume/mount/point",
+					Device:     "/dev/hfs-device",
+					FileSystem: "hfs",
+					Writable:   true,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+			},
+			source: "/hfs/volume/mount/point",
+		},
+		{
+			name: "not writable",
+			setup: func(t *testing.T, d *fakeDevices) {
+				err := d.AddVolume(diskutil.VolumeInfo{
+					Name:       "Readonly Volume",
+					UUID:       "readonly-volume-uuid",
+					MountPoint: "/readonly/volume/mount/point",
+					Device:     "/dev/readonly-device",
+					FileSystem: "apfs",
+					Writable:   false,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+			},
+			source: "/readonly/volume/mount/point",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			d := &fakeDevices{
+				volumes:   make(map[string]diskutil.VolumeInfo),
+				snapshots: make(map[string][]diskutil.Snapshot),
+			}
+			test.setup(t, d)
+			du := &fakeDiskUtil{d}
+			c := New(withDiskUtil(&readonlyFakeDiskUtil{du: du}))
+			if err := c.CloneableTarget(test.source); err == nil {
+				t.Error("CloneableTarget returnd error: nil, want: non-nil")
+			}
+		})
+	}
+}
+
 func TestClone(t *testing.T) {
 	snap1 := diskutil.Snapshot{
 		Name:    "common-snap",

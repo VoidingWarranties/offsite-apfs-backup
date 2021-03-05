@@ -21,13 +21,17 @@ import (
 const (
 	SourceImg = "testdata/source.dmg"
 	TargetImg = "testdata/target.dmg"
+
+	HFSImg               = "testdata/hfs.dmg"
+	CaseSensitiveAPFSImg = "testdata/case_sensitive_apfs.dmg"
 )
 
 // Expected metadata for each example image.
 var (
 	SourceInfo = diskutil.VolumeInfo{
-		Name: "source",
-		UUID: "CA79DDFA-D75D-43F3-8099-3BEA2F7C1F33",
+		Name:       "source",
+		UUID:       "CA79DDFA-D75D-43F3-8099-3BEA2F7C1F33",
+		FileSystem: "apfs",
 	}
 	SourceSnaps = [...]diskutil.Snapshot{
 		{
@@ -43,8 +47,9 @@ var (
 	}
 
 	TargetInfo = diskutil.VolumeInfo{
-		Name: "target",
-		UUID: "21CF5985-FA46-42AF-9872-52CDE74B04DE",
+		Name:       "target",
+		UUID:       "21CF5985-FA46-42AF-9872-52CDE74B04DE",
+		FileSystem: "apfs",
 	}
 	TargetSnaps = [...]diskutil.Snapshot{
 		{
@@ -52,6 +57,17 @@ var (
 			UUID:    "A175CCCF-0C56-4A46-97FB-CA267A540C96",
 			Created: time.Date(2021, 3, 1, 20, 34, 33, 0, time.UTC),
 		},
+	}
+
+	HFSInfo = diskutil.VolumeInfo{
+		Name:       "hfs",
+		UUID:       "4F5B6053-AB58-3899-A263-F00D22575F69",
+		FileSystem: "hfs",
+	}
+	CaseSensitiveAPFSInfo = diskutil.VolumeInfo{
+		Name:       "case-sensitive-apfs",
+		UUID:       "8969062E-E518-4591-9DEE-1DB5B16AB9DE",
+		FileSystem: "apfs",
 	}
 )
 

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"apfs-snapshot-diff-clone/cloner"
-	"apfs-snapshot-diff-clone/diskutil"
 )
 
 var (
@@ -54,17 +53,20 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-
-	for _, v := range append([]string{source}, targets...) {
-		if err := validateVolume(v); err != nil {
-			fmt.Fprintln(os.Stderr, "Invalid volume:", err)
+	c := cloner.New(cloner.Prune(*prune))
+	if err := c.CloneableSource(source); err != nil {
+		fmt.Fprintln(os.Stderr, "Invalid source volume:", err)
+		os.Exit(1)
+	}
+	for _, t := range targets {
+		if err := c.CloneableTarget(t); err != nil {
+			fmt.Fprintln(os.Stderr, "Invalid target volume:", err)
 			os.Exit(1)
 		}
 	}
 
 	errs := make(map[string]error) // Map of target volume to clone error.
 	for _, target := range targets {
-		c := cloner.New(cloner.Prune(*prune))
 		if err := c.Clone(source, target); err != nil {
 			errs[target] = err
 			log.Printf("failed to clone %q to %q: %v", source, target, err)
@@ -94,11 +96,4 @@ func parseArguments() (source string, targets []string, err error) {
 		}
 	}
 	return source, targets, nil
-}
-
-func validateVolume(volume string) error {
-	// TODO: validate that it is a volume, not some other device supported by diskutil info.
-	// TODO: validate that volume is APFS.
-	_, err := diskutil.New().Info(volume)
-	return err
 }

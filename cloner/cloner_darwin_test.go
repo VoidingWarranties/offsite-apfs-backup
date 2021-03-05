@@ -15,15 +15,150 @@ import (
 )
 
 var (
-	sourceImg = filepath.Join("../testutils/diskimage", diskimage.SourceImg)
-	targetImg = filepath.Join("../testutils/diskimage", diskimage.TargetImg)
+	sourceImg            = filepath.Join("../testutils/diskimage", diskimage.SourceImg)
+	targetImg            = filepath.Join("../testutils/diskimage", diskimage.TargetImg)
+	hfsImg               = filepath.Join("../testutils/diskimage", diskimage.HFSImg)
+	caseSensitiveAPFSImg = filepath.Join("../testutils/diskimage", diskimage.CaseSensitiveAPFSImg)
 
-	sourceInfo = diskimage.SourceInfo
-	targetInfo = diskimage.TargetInfo
+	sourceInfo            = diskimage.SourceInfo
+	targetInfo            = diskimage.TargetInfo
+	hfsInfo               = diskimage.HFSInfo
+	caseSensitiveAPFSInfo = diskimage.CaseSensitiveAPFSInfo
 
 	sourceSnaps = diskimage.SourceSnaps
 	targetSnaps = diskimage.TargetSnaps
 )
+
+func TestCloneableSource(t *testing.T) {
+	tests := []struct{
+		name   string
+		setup  func(*testing.T)
+		source string
+	}{
+		{
+			name: "readonly APFS volume",
+			setup: func(t *testing.T) {
+				diskimage.MountRO(t, sourceImg)
+			},
+			source: sourceInfo.UUID,
+		},
+		{
+			name: "readonly case sensitive APFS volume",
+			setup: func(t *testing.T) {
+				diskimage.MountRO(t, caseSensitiveAPFSImg)
+			},
+			source: caseSensitiveAPFSInfo.UUID,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			test.setup(t)
+			c := cloner.New()
+			if err := c.CloneableSource(test.source); err != nil {
+				t.Errorf("CloneableSource returned error: %q, want: nil", err)
+			}
+		})
+	}
+}
+
+func TestCloneableSource_Errors(t *testing.T) {
+	tests := []struct{
+		name  string
+		setup func(*testing.T) (volume string)
+	}{
+		{
+			name:  "not a volume",
+			setup: func(t *testing.T) string {
+				return t.TempDir()
+			},
+		},
+		{
+			name: "not an APFS volume",
+			setup: func(t *testing.T) string {
+				_, dev := diskimage.MountRO(t, hfsImg)
+				return dev
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			source := test.setup(t)
+			c := cloner.New()
+			if err := c.CloneableSource(source); err == nil {
+				t.Error("CloneableSource returned error: nil, want: non-nil")
+			}
+		})
+	}
+}
+
+func TestCloneableTarget(t *testing.T) {
+	tests := []struct{
+		name   string
+		setup  func(*testing.T)
+		target string
+	}{
+		{
+			name: "APFS volume",
+			setup: func(t *testing.T) {
+				diskimage.MountRW(t, targetImg)
+			},
+			target: targetInfo.UUID,
+		},
+		{
+			name: "case sensitive APFS volume",
+			setup: func(t *testing.T) {
+				diskimage.MountRW(t, caseSensitiveAPFSImg)
+			},
+			target: caseSensitiveAPFSInfo.UUID,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			test.setup(t)
+			c := cloner.New()
+			if err := c.CloneableTarget(test.target); err != nil {
+				t.Errorf("CloneableTarget returned error: %q, want: nil", err)
+			}
+		})
+	}
+}
+
+func TestCloneableTarget_Error(t *testing.T) {
+	tests := []struct{
+		name  string
+		setup func(*testing.T) (target string)
+	}{
+		{
+			name:  "volume not writable",
+			setup: func(t *testing.T) string {
+				_, target := diskimage.MountRO(t, targetImg)
+				return target
+			},
+		},
+		{
+			name: "not an APFS volume",
+			setup: func(t *testing.T) string {
+				_, target := diskimage.MountRW(t, hfsImg)
+				return target
+			},
+		},
+		{
+			name:  "not a volume",
+			setup: func(t *testing.T) string {
+				return t.TempDir()
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			target := test.setup(t)
+			c := cloner.New()
+			if err := c.CloneableTarget(target); err == nil {
+				t.Error("CloneableTarget returned error: nil, want: non-nil")
+			}
+		})
+	}
+}
 
 func TestClone(t *testing.T) {
 	tests := []struct {
