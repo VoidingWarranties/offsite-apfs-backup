@@ -64,6 +64,34 @@ type restorer interface {
 	Restore(source, target diskutil.VolumeInfo, to, from diskutil.Snapshot) error
 }
 
+// CloneableSource returns nil if volume is a valid source to clone.
+func (c Cloner) CloneableSource(volume string) error {
+	info, err := c.diskutil.Info(volume)
+	if err != nil {
+		return err
+	}
+	if info.FileSystem != "apfs" {
+		return fmt.Errorf("%q does not contain an APFS file system", volume)
+	}
+	return nil
+}
+
+// CloneableTarget returns nil if volume is a valid target to clone
+// to.
+func (c Cloner) CloneableTarget(volume string) error {
+	info, err := c.diskutil.Info(volume)
+	if err != nil {
+		return err
+	}
+	if info.FileSystem != "apfs" {
+		return fmt.Errorf("%q does not contain an APFS file system", volume)
+	}
+	if !info.Writable {
+		return fmt.Errorf("%q is not writeable", volume)
+	}
+	return nil
+}
+
 // Clone the latest snapshot in source to target, from the most recent common
 // snapshot present in both source and target.
 func (c Cloner) Clone(source, target string) error {

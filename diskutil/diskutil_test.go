@@ -41,7 +41,9 @@ func TestInfo(t *testing.T) {
 					"VolumeUUID": "foo-uuid",
 					"VolumeName": "foo-name",
 					"MountPoint": "/foo/mount/point",
-					"DeviceNode": "/dev/disk1s2"
+					"DeviceNode": "/dev/disk1s2",
+					"WritableVolume": true,
+					"FilesystemType": "apfs"
 				}`),
 				fakecmd.WantStdin("plutil", "<plist diskutil output>"),
 			},
@@ -50,6 +52,8 @@ func TestInfo(t *testing.T) {
 				Name:       "foo-name",
 				MountPoint: "/foo/mount/point",
 				Device:     "/dev/disk1s2",
+				Writable:   true,
+				FileSystem: "apfs",
 			},
 		},
 		{
@@ -60,7 +64,9 @@ func TestInfo(t *testing.T) {
 					"VolumeUUID": "bar-uuid",
 					"VolumeName": "bar-name",
 					"MountPoint": "/bar/mount/point",
-					"DeviceNode": "/dev/disk3s4"
+					"DeviceNode": "/dev/disk3s4",
+					"WritableVolume": false,
+					"FilesystemType": "hfs+"
 				}`),
 				fakecmd.Stderr("diskutil", "diskutil-stderr"),
 				fakecmd.Stderr("plutil", "plutil-stderr"),
@@ -71,6 +77,8 @@ func TestInfo(t *testing.T) {
 				Name:       "bar-name",
 				MountPoint: "/bar/mount/point",
 				Device:     "/dev/disk3s4",
+				Writable:   false,
+				FileSystem: "hfs+",
 			},
 		},
 	}
@@ -163,6 +171,8 @@ var (
 		UUID:       "example-volume-uuid",
 		MountPoint: "/example/volume",
 		Device:     "/dev/example-volume",
+		Writable:   true,
+		FileSystem: "apfs",
 	}
 )
 

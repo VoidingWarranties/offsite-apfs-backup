@@ -17,26 +17,77 @@ var (
 	imgInfo  = diskimage.SourceInfo
 	imgSnaps = diskimage.SourceSnaps
 
+	hfsImg  = filepath.Join("../testutils/diskimage", diskimage.HFSImg)
+	hfsInfo = diskimage.HFSInfo
+
+	caseSensitiveAPFSImg  = filepath.Join("../testutils/diskimage", diskimage.CaseSensitiveAPFSImg)
+	caseSensitiveAPFSInfo = diskimage.CaseSensitiveAPFSInfo
+
 	nonexistentVolume = diskutil.VolumeInfo{
 		Name:       "Not A Volume",
 		UUID:       "not-a-volume-uuid",
 		MountPoint: "/not/a/volume",
 		Device:     "/dev/not-a-volume-device",
+		Writable:   true,
+		FileSystem: "apfs",
 	}
 )
 
 func TestInfo(t *testing.T) {
-	mountpoint, device := diskimage.MountRO(t, img)
-	du := diskutil.New()
-	got, err := du.Info(mountpoint)
-	if err != nil {
-		t.Fatalf("Info returned unexpected error: %v, want: nil", err)
+	tests := []struct{
+		name   string
+		setup  func(*testing.T) diskutil.VolumeInfo
+		volume string
+	}{
+		{
+			name: "readonly APFS volume",
+			setup: func(t *testing.T) diskutil.VolumeInfo {
+				mountpoint, device := diskimage.MountRO(t, img)
+				want := imgInfo
+				want.MountPoint = mountpoint
+				want.Device = device
+				want.Writable = false
+				return want
+			},
+			volume: imgInfo.UUID,
+		},
+		{
+			name: "case sensitive APFS volume",
+			setup: func(t *testing.T) diskutil.VolumeInfo {
+				mountpoint, device := diskimage.MountRW(t, caseSensitiveAPFSImg)
+				want := caseSensitiveAPFSInfo
+				want.MountPoint = mountpoint
+				want.Device = device
+				want.Writable = true
+				return want
+			},
+			volume: caseSensitiveAPFSInfo.UUID,
+		},
+		{
+			name: "readwrite HFS+ volume",
+			setup: func(t *testing.T) diskutil.VolumeInfo {
+				mountpoint, device := diskimage.MountRW(t, hfsImg)
+				want := hfsInfo
+				want.MountPoint = mountpoint
+				want.Device = device
+				want.Writable = true
+				return want
+			},
+			volume: hfsInfo.UUID,
+		},
 	}
-	want := imgInfo
-	want.MountPoint = mountpoint
-	want.Device = device
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("Info returned unexpected volume info. -want +got:\n%s", diff)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			want := test.setup(t)
+			du := diskutil.New()
+			got, err := du.Info(test.volume)
+			if err != nil {
+				t.Fatalf("Info returned unexpected error: %v, want: nil", err)
+			}
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("Info returned unexpected volume info. -want +got:\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -83,6 +134,7 @@ func TestRename(t *testing.T) {
 	want.Name = "newname"
 	want.MountPoint = mountpoint
 	want.Device = device
+	want.Writable = true
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("Rename resulted in unexpected results. -want +got:\n%s", diff)
 	}
