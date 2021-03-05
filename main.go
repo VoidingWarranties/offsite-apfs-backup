@@ -5,18 +5,31 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 
 	"apfs-snapshot-diff-clone/cloner"
 )
 
 var (
-	source  = flag.String("source", "", "source APFS volume to clone - may be a mount point, /dev/ path, or volume UUID")
-	targets targetsFlag
-	prune   = flag.Bool("prune", false, "prune the latest snapshot that source and target had in common before the clone")
+	prune = flag.Bool("prune", false, `If false (default), no snapshots are removed from target.
+If true, prune from target the latest snapshot that source and target had in common before the clone.
+Must be false if -incremental is false.`)
 )
 
 func init() {
-	flag.Var(&targets, "target", "target APFS volume to clone to - may be specified multiple times - may be a mount point, /dev/ path, or volume UUID")
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), `Usage: %s [-prune=true] [--] <source volume> <target volume> [<target volume>...]
+
+  <source volume>
+    	Source APFS volume to clone.
+    	May be a mount point, /dev/ path, or volume UUID.
+  <target volume>
+    	Target APFS volume(s) to clone to.
+    	May be specified multiple times.
+    	May be a mount point, /dev/ path, or volume UUID.
+`, os.Args[0])
+		flag.CommandLine.PrintDefaults()
+	}
 }
 
 type targetsFlag []string
@@ -32,16 +45,22 @@ func (f *targetsFlag) Set(value string) error {
 
 func main() {
 	flag.Parse()
-	if err := validateFlags(); err != nil {
-		log.Fatal(err)
+	source, targets, err := parseArguments()
+	if err != nil {
+		fmt.Fprintln(flag.CommandLine.Output(), "Error:", err)
+		flag.Usage()
+		os.Exit(1)
 	}
+
+	// TODO: validate source and targets are valid volumes by calling diskutil.Info.
+	// TODO: escape-quote source and target to prevent accidental flag injection?
 
 	errs := make(map[string]error) // Map of target volume to clone error.
 	for _, target := range targets {
 		c := cloner.New(cloner.Prune(*prune))
-		if err := c.Clone(*source, target); err != nil {
+		if err := c.Clone(source, target); err != nil {
 			errs[target] = err
-			log.Printf("failed to clone %q to %q: %v", *source, target, err)
+			log.Printf("failed to clone %q to %q: %v", source, target, err)
 		}
 	}
 	if len(errs) > 0 {
@@ -49,12 +68,15 @@ func main() {
 	}
 }
 
-func validateFlags() error {
-	if *source == "" {
-		return errors.New("-source is required")
+func parseArguments() (source string, targets []string, err error) {
+	args := flag.Args()
+	if len(args) < 1 {
+		return "", nil, errors.New("<source volume> and <target volume> are required")
 	}
-	if len(targets) == 0 {
-		return errors.New("at least one -target is required")
+	if len(args) < 2 {
+		return "", nil, errors.New("at least one <target volume> is required")
 	}
-	return nil
+	source = args[0]
+	targets = args[1:]
+	return source, targets, nil
 }
