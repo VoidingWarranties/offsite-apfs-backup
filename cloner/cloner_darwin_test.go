@@ -30,7 +30,7 @@ var (
 )
 
 func TestCloneableSource(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name   string
 		setup  func(*testing.T)
 		source string
@@ -62,12 +62,12 @@ func TestCloneableSource(t *testing.T) {
 }
 
 func TestCloneableSource_Errors(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name  string
 		setup func(*testing.T) (volume string)
 	}{
 		{
-			name:  "not a volume",
+			name: "not a volume",
 			setup: func(t *testing.T) string {
 				return t.TempDir()
 			},
@@ -92,7 +92,7 @@ func TestCloneableSource_Errors(t *testing.T) {
 }
 
 func TestCloneableTarget(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name   string
 		setup  func(*testing.T)
 		target string
@@ -124,12 +124,12 @@ func TestCloneableTarget(t *testing.T) {
 }
 
 func TestCloneableTarget_Error(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name  string
 		setup func(*testing.T) (target string)
 	}{
 		{
-			name:  "volume not writable",
+			name: "volume not writable",
 			setup: func(t *testing.T) string {
 				_, target := diskimage.MountRO(t, targetImg)
 				return target
@@ -143,7 +143,7 @@ func TestCloneableTarget_Error(t *testing.T) {
 			},
 		},
 		{
-			name:  "not a volume",
+			name: "not a volume",
 			setup: func(t *testing.T) string {
 				return t.TempDir()
 			},

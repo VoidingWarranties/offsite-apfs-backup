@@ -34,7 +34,7 @@ var (
 )
 
 func TestInfo(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name   string
 		setup  func(*testing.T) diskutil.VolumeInfo
 		volume string
