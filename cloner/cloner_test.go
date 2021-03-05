@@ -29,7 +29,7 @@ func TestCloneableSource(t *testing.T) {
 }
 
 func TestCloneableSource_Errors(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name   string
 		setup  func(*testing.T, *fakeDevices)
 		source string
@@ -92,7 +92,7 @@ func TestCloneableTarget(t *testing.T) {
 }
 
 func TestCloneableTarget_Errors(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name   string
 		setup  func(*testing.T, *fakeDevices)
 		source string
