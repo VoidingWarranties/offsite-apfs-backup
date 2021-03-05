@@ -6,14 +6,17 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"apfs-snapshot-diff-clone/cloner"
+	"apfs-snapshot-diff-clone/diskutil"
 )
 
 var (
 	prune = flag.Bool("prune", false, `If false (default), no snapshots are removed from target.
 If true, prune from target the latest snapshot that source and target had in common before the clone.
 Must be false if -incremental is false.`)
+	// TODO: incremental flag
 )
 
 func init() {
@@ -52,8 +55,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// TODO: validate source and targets are valid volumes by calling diskutil.Info.
-	// TODO: escape-quote source and target to prevent accidental flag injection?
+	for _, v := range append([]string{source}, targets...) {
+		if err := validateVolume(v); err != nil {
+			fmt.Fprintln(os.Stderr, "Invalid volume:", err)
+			os.Exit(1)
+		}
+	}
 
 	errs := make(map[string]error) // Map of target volume to clone error.
 	for _, target := range targets {
@@ -77,6 +84,21 @@ func parseArguments() (source string, targets []string, err error) {
 		return "", nil, errors.New("at least one <target volume> is required")
 	}
 	source = args[0]
+	if strings.HasPrefix(source, "-") {
+		return "", nil, fmt.Errorf("%q is not a valid volume", source)
+	}
 	targets = args[1:]
+	for _, t := range targets {
+		if strings.HasPrefix(t, "-") {
+			return "", nil, fmt.Errorf("%q is not a valid volume", t)
+		}
+	}
 	return source, targets, nil
+}
+
+func validateVolume(volume string) error {
+	// TODO: validate that it is a volume, not some other device supported by diskutil info.
+	// TODO: validate that volume is APFS.
+	_, err := diskutil.New().Info(volume)
+	return err
 }
