@@ -10,52 +10,113 @@ import (
 	"apfs-snapshot-diff-clone/diskutil"
 )
 
-func TestCloneableSource(t *testing.T) {
-	d := &fakeDevices{
-		volumes:   make(map[string]diskutil.VolumeInfo),
-		snapshots: make(map[string][]diskutil.Snapshot),
-	}
-	d.AddVolume(diskutil.VolumeInfo{
-		Name:           "foo-name",
-		UUID:           "123-foo-uuid",
-		MountPoint:     "/foo/mount/point",
+func TestCloneable(t *testing.T) {
+	source := diskutil.VolumeInfo{
+		Name:           "source-name",
+		UUID:           "123-source-uuid",
+		MountPoint:     "/source/mount/point",
+		Device:         "/dev/disk-source",
+		Writable:       false,
 		FileSystemType: "apfs",
 		FileSystem:     "APFS",
-	})
-	du := &fakeDiskUtil{d}
-	c := New(withDiskUtil(&readonlyFakeDiskUtil{du: du}))
-	if err := c.CloneableSource("/foo/mount/point"); err != nil {
-		t.Errorf("CloneableSource returned error: %q, want: nil", err)
 	}
-}
+	caseSensitiveSource := diskutil.VolumeInfo{
+		Name:           "case-sensitive-source-name",
+		UUID:           "123-case-sensitive-source-uuid",
+		MountPoint:     "/case-senstive-source/mount/point",
+		Device:         "/dev/disk-case-sensitive-source",
+		Writable:       false,
+		FileSystemType: "apfs",
+		FileSystem:     "Case-sensitive APFS",
+	}
+	target1 := diskutil.VolumeInfo{
+		Name:           "target1-name",
+		UUID:           "123-target1-uuid",
+		MountPoint:     "/target1/mount/point",
+		Device:         "/dev/disk-target1",
+		Writable:       true,
+		FileSystemType: "apfs",
+		FileSystem:     "APFS",
+	}
+	caseSensitiveTarget1 := diskutil.VolumeInfo{
+		Name:           "target1-name",
+		UUID:           "123-target1-uuid",
+		MountPoint:     "/target1/mount/point",
+		Device:         "/dev/disk-target1",
+		Writable:       true,
+		FileSystemType: "apfs",
+		FileSystem:     "Case-sensitive APFS",
+	}
+	target2 := diskutil.VolumeInfo{
+		Name:           "target2-name",
+		UUID:           "123-target2-uuid",
+		MountPoint:     "/target2/mount/point",
+		Device:         "/dev/disk-target2",
+		Writable:       true,
+		FileSystemType: "apfs",
+		FileSystem:     "APFS",
+	}
 
-func TestCloneableSource_Errors(t *testing.T) {
+	latestSnap := diskutil.Snapshot{
+		Name: "latest-snap",
+		UUID: "latest-snap-uuid",
+	}
+	commonSnap1 := diskutil.Snapshot{
+		Name: "common-snap-1",
+		UUID: "common-snap-1-uuid",
+	}
+	commonSnap2 := diskutil.Snapshot{
+		Name: "common-snap-2",
+		UUID: "common-snap-2-uuid",
+	}
+
 	tests := []struct {
-		name   string
-		setup  func(*testing.T, *fakeDevices)
-		source string
+		name    string
+		setup   func(*testing.T, *fakeDevices)
+		source  string
+		targets []string
 	}{
 		{
-			name:   "not a device",
-			setup:  func(*testing.T, *fakeDevices) {},
-			source: "not-a-volume-uuid",
-		},
-		{
-			name: "not not an APFS volume",
+			name: "single target",
 			setup: func(t *testing.T, d *fakeDevices) {
-				err := d.AddVolume(diskutil.VolumeInfo{
-					Name:           "HFS Volume",
-					UUID:           "hfs-volume-uuid",
-					MountPoint:     "/hfs/volume/mount/point",
-					Device:         "/dev/hfs-device",
-					FileSystemType: "hfs",
-					FileSystem:     "HFS+",
-				})
-				if err != nil {
+				if err := d.AddVolume(source, latestSnap, commonSnap2, commonSnap1); err != nil {
+					t.Fatal(err)
+				}
+				if err := d.AddVolume(target1, commonSnap1); err != nil {
 					t.Fatal(err)
 				}
 			},
-			source: "/hfs/volume/mount/point",
+			source:  source.MountPoint,
+			targets: []string{target1.MountPoint},
+		},
+		{
+			name: "multiple targets",
+			setup: func(t *testing.T, d *fakeDevices) {
+				if err := d.AddVolume(source, latestSnap, commonSnap2, commonSnap1); err != nil {
+					t.Fatal(err)
+				}
+				if err := d.AddVolume(target1, commonSnap1); err != nil {
+					t.Fatal(err)
+				}
+				if err := d.AddVolume(target2, commonSnap2); err != nil {
+					t.Fatal(err)
+				}
+			},
+			source:  source.Device,
+			targets: []string{target1.Device, target2.UUID},
+		},
+		{
+			name: "Case-sensitive APFS",
+			setup: func(t *testing.T, d *fakeDevices) {
+				if err := d.AddVolume(caseSensitiveSource, latestSnap, commonSnap1); err != nil {
+					t.Fatal(err)
+				}
+				if err := d.AddVolume(caseSensitiveTarget1, commonSnap1); err != nil {
+					t.Fatal(err)
+				}
+			},
+			source:  caseSensitiveSource.Device,
+			targets: []string{caseSensitiveTarget1.MountPoint},
 		},
 	}
 	for _, test := range tests {
@@ -67,79 +128,241 @@ func TestCloneableSource_Errors(t *testing.T) {
 			test.setup(t, d)
 			du := &fakeDiskUtil{d}
 			c := New(withDiskUtil(&readonlyFakeDiskUtil{du: du}))
-			if err := c.CloneableSource(test.source); err == nil {
-				t.Error("CloneableSource returnd error: nil, want: non-nil")
+			if err := c.Cloneable(test.source, test.targets...); err != nil {
+				t.Errorf("Cloneable returned error: %q, want: nil", err)
 			}
 		})
 	}
 }
 
-func TestCloneableTarget(t *testing.T) {
-	d := &fakeDevices{
-		volumes:   make(map[string]diskutil.VolumeInfo),
-		snapshots: make(map[string][]diskutil.Snapshot),
+func TestCloneable_Errors(t *testing.T) {
+	source := diskutil.VolumeInfo{
+		Name:           "source-name",
+		UUID:           "123-source-uuid",
+		MountPoint:     "/source/mount/point",
+		Device:         "/dev/disk-source",
+		Writable:       false,
+		FileSystemType: "apfs",
+		FileSystem:     "APFS",
 	}
-	d.AddVolume(diskutil.VolumeInfo{
-		Name:           "foo-name",
-		UUID:           "123-foo-uuid",
-		MountPoint:     "/foo/mount/point",
+	target := diskutil.VolumeInfo{
+		Name:           "target-name",
+		UUID:           "123-target-uuid",
+		MountPoint:     "/target/mount/point",
+		Device:         "/dev/disk-target",
 		Writable:       true,
 		FileSystemType: "apfs",
 		FileSystem:     "APFS",
-	})
-	du := &fakeDiskUtil{d}
-	c := New(withDiskUtil(&readonlyFakeDiskUtil{du: du}))
-	if err := c.CloneableTarget("/foo/mount/point"); err != nil {
-		t.Errorf("CloneableTarget returned error: %q, want: nil", err)
 	}
-}
+	caseSensitiveAPFS := diskutil.VolumeInfo{
+		Name:           "case-sensitive-apfs-name",
+		UUID:           "123-case-sensitive-apfs-uuid",
+		MountPoint:     "/case-sensitive-apfs/mount/point",
+		Device:         "/dev/disk-case-sensitive-apfs",
+		Writable:       true,
+		FileSystemType: "apfs",
+		FileSystem:     "Case-sensitive APFS",
+	}
+	hfs := diskutil.VolumeInfo{
+		Name:           "hfs-name",
+		UUID:           "123-hfs-uuid",
+		MountPoint:     "/hfs/mount/point",
+		Device:         "/dev/disk-hfs",
+		Writable:       true,
+		FileSystemType: "hfs",
+		FileSystem:     "HFS+",
+	}
+	readonly := diskutil.VolumeInfo{
+		Name:           "readonly-name",
+		UUID:           "123-readonly-uuid",
+		MountPoint:     "/readonly/mount/point",
+		Device:         "/dev/disk-readonly",
+		Writable:       false,
+		FileSystemType: "apfs",
+		FileSystem:     "APFS",
+	}
 
-func TestCloneableTarget_Errors(t *testing.T) {
+	latestSnap := diskutil.Snapshot{
+		Name: "latest-snap",
+		UUID: "latest-snap-uuid",
+	}
+	commonSnap := diskutil.Snapshot{
+		Name: "common-snap",
+		UUID: "common-snap-uuid",
+	}
+	uncommonSnap := diskutil.Snapshot{
+		Name: "uncommon-snap",
+		UUID: "uncommon-snap-uuid",
+	}
+
 	tests := []struct {
-		name   string
-		setup  func(*testing.T, *fakeDevices)
-		source string
+		name    string
+		setup   func(*testing.T, *fakeDevices)
+		source  string
+		targets []string
 	}{
 		{
-			name:   "not a device",
-			setup:  func(*testing.T, *fakeDevices) {},
-			source: "not-a-volume-uuid",
-		},
-		{
-			name: "not not an APFS volume",
+			name: "source not a device",
 			setup: func(t *testing.T, d *fakeDevices) {
-				err := d.AddVolume(diskutil.VolumeInfo{
-					Name:           "HFS Volume",
-					UUID:           "hfs-volume-uuid",
-					MountPoint:     "/hfs/volume/mount/point",
-					Device:         "/dev/hfs-device",
-					Writable:       true,
-					FileSystemType: "hfs",
-					FileSystem:     "HFS+",
-				})
-				if err != nil {
+				if err := d.AddVolume(target, commonSnap); err != nil {
 					t.Fatal(err)
 				}
 			},
-			source: "/hfs/volume/mount/point",
+			source:  "not-a-volume-uuid",
+			targets: []string{target.UUID},
 		},
 		{
-			name: "not writable",
+			name: "one of the targets is not a device",
 			setup: func(t *testing.T, d *fakeDevices) {
-				err := d.AddVolume(diskutil.VolumeInfo{
-					Name:           "Readonly Volume",
-					UUID:           "readonly-volume-uuid",
-					MountPoint:     "/readonly/volume/mount/point",
-					Device:         "/dev/readonly-device",
-					Writable:       false,
-					FileSystemType: "apfs",
-					FileSystem:     "APFS",
-				})
-				if err != nil {
+				if err := d.AddVolume(source, latestSnap, commonSnap); err != nil {
+					t.Fatal(err)
+				}
+				if err := d.AddVolume(target, commonSnap); err != nil {
 					t.Fatal(err)
 				}
 			},
-			source: "/readonly/volume/mount/point",
+			source:  source.UUID,
+			targets: []string{target.UUID, "not-a-volume-uuid"},
+		},
+		{
+			name: "same target repeated multiple times",
+			setup: func(t *testing.T, d *fakeDevices) {
+				if err := d.AddVolume(source, latestSnap, commonSnap); err != nil {
+					t.Fatal(err)
+				}
+				if err := d.AddVolume(target, commonSnap); err != nil {
+					t.Fatal(err)
+				}
+			},
+			source:  source.UUID,
+			targets: []string{target.UUID, target.MountPoint},
+		},
+		{
+			name: "source and target are same",
+			setup: func(t *testing.T, d *fakeDevices) {
+				if err := d.AddVolume(source, latestSnap, commonSnap); err != nil {
+					t.Fatal(err)
+				}
+			},
+			source:  source.UUID,
+			targets: []string{source.MountPoint},
+		},
+		{
+			name: "target has no snapshots in common with source",
+			setup: func(t *testing.T, d *fakeDevices) {
+				if err := d.AddVolume(source, latestSnap); err != nil {
+					t.Fatal(err)
+				}
+				if err := d.AddVolume(target, uncommonSnap); err != nil {
+					t.Fatal(err)
+				}
+			},
+			source:  source.UUID,
+			targets: []string{target.UUID},
+		},
+		{
+			name: "source has no snapshots",
+			setup: func(t *testing.T, d *fakeDevices) {
+				if err := d.AddVolume(source); err != nil {
+					t.Fatal(err)
+				}
+				if err := d.AddVolume(target, commonSnap); err != nil {
+					t.Fatal(err)
+				}
+			},
+			source:  source.UUID,
+			targets: []string{target.UUID},
+		},
+		{
+			name: "target has no snapshots",
+			setup: func(t *testing.T, d *fakeDevices) {
+				if err := d.AddVolume(source, latestSnap, commonSnap); err != nil {
+					t.Fatal(err)
+				}
+				if err := d.AddVolume(target); err != nil {
+					t.Fatal(err)
+				}
+			},
+			source:  source.UUID,
+			targets: []string{target.UUID},
+		},
+		{
+			name: "source and target have same latest snapshot",
+			setup: func(t *testing.T, d *fakeDevices) {
+				if err := d.AddVolume(source, latestSnap, commonSnap); err != nil {
+					t.Fatal(err)
+				}
+				if err := d.AddVolume(target, latestSnap, commonSnap); err != nil {
+					t.Fatal(err)
+				}
+			},
+			source:  source.UUID,
+			targets: []string{target.UUID},
+		},
+		{
+			name: "target snapshot is ahead of latest source snapshot",
+			setup: func(t *testing.T, d *fakeDevices) {
+				if err := d.AddVolume(source, commonSnap); err != nil {
+					t.Fatal(err)
+				}
+				if err := d.AddVolume(target, latestSnap, commonSnap); err != nil {
+					t.Fatal(err)
+				}
+			},
+			source:  source.UUID,
+			targets: []string{target.UUID},
+		},
+		{
+			name: "source is not an APFS volume",
+			setup: func(t *testing.T, d *fakeDevices) {
+				if err := d.AddVolume(hfs); err != nil {
+					t.Fatal(err)
+				}
+				if err := d.AddVolume(target, commonSnap); err != nil {
+					t.Fatal(err)
+				}
+			},
+			source:  hfs.UUID,
+			targets: []string{target.UUID},
+		},
+		{
+			name: "target is not an APFS volume",
+			setup: func(t *testing.T, d *fakeDevices) {
+				if err := d.AddVolume(source, latestSnap, commonSnap); err != nil {
+					t.Fatal(err)
+				}
+				if err := d.AddVolume(hfs); err != nil {
+					t.Fatal(err)
+				}
+			},
+			source:  source.UUID,
+			targets: []string{hfs.UUID},
+		},
+		{
+			name: "source and target have same filesystem type, but different file systems",
+			setup: func(t *testing.T, d *fakeDevices) {
+				if err := d.AddVolume(caseSensitiveAPFS, latestSnap, commonSnap); err != nil {
+					t.Fatal(err)
+				}
+				if err := d.AddVolume(target, commonSnap); err != nil {
+					t.Fatal(err)
+				}
+			},
+			source:  caseSensitiveAPFS.UUID,
+			targets: []string{target.UUID},
+		},
+		{
+			name: "target not writable",
+			setup: func(t *testing.T, d *fakeDevices) {
+				if err := d.AddVolume(source, latestSnap, commonSnap); err != nil {
+					t.Fatal(err)
+				}
+				if err := d.AddVolume(readonly, commonSnap); err != nil {
+					t.Fatal(err)
+				}
+			},
+			source:  source.UUID,
+			targets: []string{readonly.UUID},
 		},
 	}
 	for _, test := range tests {
@@ -151,8 +374,8 @@ func TestCloneableTarget_Errors(t *testing.T) {
 			test.setup(t, d)
 			du := &fakeDiskUtil{d}
 			c := New(withDiskUtil(&readonlyFakeDiskUtil{du: du}))
-			if err := c.CloneableTarget(test.source); err == nil {
-				t.Error("CloneableTarget returnd error: nil, want: non-nil")
+			if err := c.Cloneable(test.source, test.targets...); err == nil {
+				t.Error("Cloneable returnd error: nil, want: non-nil")
 			}
 		})
 	}
