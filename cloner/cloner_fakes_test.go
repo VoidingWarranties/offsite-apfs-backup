@@ -15,7 +15,7 @@ type fakeDevices struct {
 
 func (d *fakeDevices) Volume(id string) (diskutil.VolumeInfo, error) {
 	for _, info := range d.volumes {
-		if info.UUID == id || info.Name == id || info.MountPoint == id {
+		if info.UUID == id || info.Name == id || info.MountPoint == id || info.Device == id {
 			return info, nil
 		}
 	}

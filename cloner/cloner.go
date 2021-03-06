@@ -64,31 +64,73 @@ type restorer interface {
 	Restore(source, target diskutil.VolumeInfo, to, from diskutil.Snapshot) error
 }
 
-// CloneableSource returns nil if volume is a valid source to clone.
-func (c Cloner) CloneableSource(volume string) error {
-	info, err := c.diskutil.Info(volume)
+// Cloneable returns nil if source is cloneable to all targets, where cloneable
+// is defined as:
+//   - All source and target volumes exist, and are APFS volumes.
+//   - All source and target volumes have the same file system.
+//     i.e. all must be non-case-sensitive, or all must be case-sensitive.
+//   - All targets are writable.
+//   - All targets must have a snapshot in common with source.
+//   - The snapshot in common must not be the latest snapshot in source.
+func (c Cloner) Cloneable(source string, targets ...string) error {
+	sourceInfo, err := c.diskutil.Info(source)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid source volume: %v", err)
 	}
-	if info.FileSystemType != "apfs" {
-		return fmt.Errorf("%q does not contain an APFS file system", volume)
+	if sourceInfo.FileSystemType != "apfs" {
+		return errors.New("invalid source volume: does not contain an APFS file system")
+	}
+
+	if len(targets) == 0 {
+		return errors.New("no targets")
+	}
+	// Map of target UUIDs to the target argument.
+	targetUUIDs := make(map[string]string)
+	for _, t := range targets {
+		targetInfo, err := c.diskutil.Info(t)
+		if err != nil {
+			return fmt.Errorf("invalid target volume: %v", err)
+		}
+		if duplicate := targetUUIDs[targetInfo.UUID]; duplicate != "" {
+			return fmt.Errorf("invalid target: %q is the same as %q", t, duplicate)
+		}
+		targetUUIDs[targetInfo.UUID] = t
+		if targetInfo.FileSystemType != "apfs" {
+			return errors.New("invalid target volume: does not contain an APFS file system")
+		}
+		if !targetInfo.Writable {
+			return errors.New("invalid target volume: volume not writable")
+		}
+		if err := c.cloneable(sourceInfo, targetInfo); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-// CloneableTarget returns nil if volume is a valid target to clone
-// to.
-func (c Cloner) CloneableTarget(volume string) error {
-	info, err := c.diskutil.Info(volume)
+func (c Cloner) cloneable(source, target diskutil.VolumeInfo) error {
+	// `asr restore` will restore the target volume to the same file system
+	// as source. To be safe, error here to prevent changing the file
+	// system without the user knowing.
+	if source.FileSystem != target.FileSystem {
+		return fmt.Errorf("invalid source + target combination: source is formatted as %s, but target is formatted as %s", source.FileSystem, target.FileSystem)
+	}
+	if source.UUID == target.UUID {
+		return errors.New("source and target must be different volumes")
+	}
+
+	sourceSnaps, err := c.diskutil.ListSnapshots(source)
 	if err != nil {
-		return err
+		return fmt.Errorf("error listing snapshots of source: %v", err)
 	}
-	if info.FileSystemType != "apfs" {
-		return fmt.Errorf("%q does not contain an APFS file system", volume)
+	targetSnaps, err := c.diskutil.ListSnapshots(target)
+	if err != nil {
+		return fmt.Errorf("error listing snapshots of target: %v", err)
 	}
-	if !info.Writable {
-		return fmt.Errorf("%q is not writeable", volume)
+	if _, err := latestCommonSnapshot(sourceSnaps, targetSnaps); err != nil {
+		return fmt.Errorf("error finding latest snapshot in common between source and target: %v", err)
 	}
+
 	return nil
 }
 

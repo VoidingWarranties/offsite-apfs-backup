@@ -54,15 +54,9 @@ func main() {
 		os.Exit(1)
 	}
 	c := cloner.New(cloner.Prune(*prune))
-	if err := c.CloneableSource(source); err != nil {
-		fmt.Fprintln(os.Stderr, "Invalid source volume:", err)
+	if err := c.Cloneable(source, targets...); err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
-	}
-	for _, t := range targets {
-		if err := c.CloneableTarget(t); err != nil {
-			fmt.Fprintln(os.Stderr, "Invalid target volume:", err)
-			os.Exit(1)
-		}
 	}
 
 	errs := make(map[string]error) // Map of target volume to clone error.
