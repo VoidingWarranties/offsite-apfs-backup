@@ -16,10 +16,11 @@ func TestCloneableSource(t *testing.T) {
 		snapshots: make(map[string][]diskutil.Snapshot),
 	}
 	d.AddVolume(diskutil.VolumeInfo{
-		Name:       "foo-name",
-		UUID:       "123-foo-uuid",
-		MountPoint: "/foo/mount/point",
-		FileSystem: "apfs",
+		Name:           "foo-name",
+		UUID:           "123-foo-uuid",
+		MountPoint:     "/foo/mount/point",
+		FileSystemType: "apfs",
+		FileSystem:     "APFS",
 	})
 	du := &fakeDiskUtil{d}
 	c := New(withDiskUtil(&readonlyFakeDiskUtil{du: du}))
@@ -43,11 +44,12 @@ func TestCloneableSource_Errors(t *testing.T) {
 			name: "not not an APFS volume",
 			setup: func(t *testing.T, d *fakeDevices) {
 				err := d.AddVolume(diskutil.VolumeInfo{
-					Name:       "HFS Volume",
-					UUID:       "hfs-volume-uuid",
-					MountPoint: "/hfs/volume/mount/point",
-					Device:     "/dev/hfs-device",
-					FileSystem: "hfs",
+					Name:           "HFS Volume",
+					UUID:           "hfs-volume-uuid",
+					MountPoint:     "/hfs/volume/mount/point",
+					Device:         "/dev/hfs-device",
+					FileSystemType: "hfs",
+					FileSystem:     "HFS+",
 				})
 				if err != nil {
 					t.Fatal(err)
@@ -78,11 +80,12 @@ func TestCloneableTarget(t *testing.T) {
 		snapshots: make(map[string][]diskutil.Snapshot),
 	}
 	d.AddVolume(diskutil.VolumeInfo{
-		Name:       "foo-name",
-		UUID:       "123-foo-uuid",
-		MountPoint: "/foo/mount/point",
-		FileSystem: "apfs",
-		Writable:   true,
+		Name:           "foo-name",
+		UUID:           "123-foo-uuid",
+		MountPoint:     "/foo/mount/point",
+		Writable:       true,
+		FileSystemType: "apfs",
+		FileSystem:     "APFS",
 	})
 	du := &fakeDiskUtil{d}
 	c := New(withDiskUtil(&readonlyFakeDiskUtil{du: du}))
@@ -106,12 +109,13 @@ func TestCloneableTarget_Errors(t *testing.T) {
 			name: "not not an APFS volume",
 			setup: func(t *testing.T, d *fakeDevices) {
 				err := d.AddVolume(diskutil.VolumeInfo{
-					Name:       "HFS Volume",
-					UUID:       "hfs-volume-uuid",
-					MountPoint: "/hfs/volume/mount/point",
-					Device:     "/dev/hfs-device",
-					FileSystem: "hfs",
-					Writable:   true,
+					Name:           "HFS Volume",
+					UUID:           "hfs-volume-uuid",
+					MountPoint:     "/hfs/volume/mount/point",
+					Device:         "/dev/hfs-device",
+					Writable:       true,
+					FileSystemType: "hfs",
+					FileSystem:     "HFS+",
 				})
 				if err != nil {
 					t.Fatal(err)
@@ -123,12 +127,13 @@ func TestCloneableTarget_Errors(t *testing.T) {
 			name: "not writable",
 			setup: func(t *testing.T, d *fakeDevices) {
 				err := d.AddVolume(diskutil.VolumeInfo{
-					Name:       "Readonly Volume",
-					UUID:       "readonly-volume-uuid",
-					MountPoint: "/readonly/volume/mount/point",
-					Device:     "/dev/readonly-device",
-					FileSystem: "apfs",
-					Writable:   false,
+					Name:           "Readonly Volume",
+					UUID:           "readonly-volume-uuid",
+					MountPoint:     "/readonly/volume/mount/point",
+					Device:         "/dev/readonly-device",
+					Writable:       false,
+					FileSystemType: "apfs",
+					FileSystem:     "APFS",
 				})
 				if err != nil {
 					t.Fatal(err)

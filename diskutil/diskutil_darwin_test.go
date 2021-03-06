@@ -24,12 +24,13 @@ var (
 	caseSensitiveAPFSInfo = diskimage.CaseSensitiveAPFSInfo
 
 	nonexistentVolume = diskutil.VolumeInfo{
-		Name:       "Not A Volume",
-		UUID:       "not-a-volume-uuid",
-		MountPoint: "/not/a/volume",
-		Device:     "/dev/not-a-volume-device",
-		Writable:   true,
-		FileSystem: "apfs",
+		Name:           "Not A Volume",
+		UUID:           "not-a-volume-uuid",
+		MountPoint:     "/not/a/volume",
+		Device:         "/dev/not-a-volume-device",
+		Writable:       true,
+		FileSystemType: "apfs",
+		FileSystem:     "APFS",
 	}
 )
 

@@ -43,17 +43,19 @@ func TestInfo(t *testing.T) {
 					"MountPoint": "/foo/mount/point",
 					"DeviceNode": "/dev/disk1s2",
 					"WritableVolume": true,
-					"FilesystemType": "apfs"
+					"FilesystemType": "apfs",
+					"FilesystemName": "Case-sensitive APFS"
 				}`),
 				fakecmd.WantStdin("plutil", "<plist diskutil output>"),
 			},
 			want: VolumeInfo{
-				UUID:       "foo-uuid",
-				Name:       "foo-name",
-				MountPoint: "/foo/mount/point",
-				Device:     "/dev/disk1s2",
-				Writable:   true,
-				FileSystem: "apfs",
+				UUID:           "foo-uuid",
+				Name:           "foo-name",
+				MountPoint:     "/foo/mount/point",
+				Device:         "/dev/disk1s2",
+				Writable:       true,
+				FileSystemType: "apfs",
+				FileSystem:     "Case-sensitive APFS",
 			},
 		},
 		{
@@ -66,19 +68,21 @@ func TestInfo(t *testing.T) {
 					"MountPoint": "/bar/mount/point",
 					"DeviceNode": "/dev/disk3s4",
 					"WritableVolume": false,
-					"FilesystemType": "hfs+"
+					"FilesystemType": "hfs",
+					"FilesystemName": "HFS+"
 				}`),
 				fakecmd.Stderr("diskutil", "diskutil-stderr"),
 				fakecmd.Stderr("plutil", "plutil-stderr"),
 				fakecmd.WantStdin("plutil", "<plist diskutil output>"),
 			},
 			want: VolumeInfo{
-				UUID:       "bar-uuid",
-				Name:       "bar-name",
-				MountPoint: "/bar/mount/point",
-				Device:     "/dev/disk3s4",
-				Writable:   false,
-				FileSystem: "hfs+",
+				UUID:           "bar-uuid",
+				Name:           "bar-name",
+				MountPoint:     "/bar/mount/point",
+				Device:         "/dev/disk3s4",
+				Writable:       false,
+				FileSystemType: "hfs",
+				FileSystem:     "HFS+",
 			},
 		},
 	}
@@ -167,12 +171,13 @@ func TestInfo_Errors(t *testing.T) {
 
 var (
 	exampleVolumeInfo = VolumeInfo{
-		Name:       "Example Volume",
-		UUID:       "example-volume-uuid",
-		MountPoint: "/example/volume",
-		Device:     "/dev/example-volume",
-		Writable:   true,
-		FileSystem: "apfs",
+		Name:           "Example Volume",
+		UUID:           "example-volume-uuid",
+		MountPoint:     "/example/volume",
+		Device:         "/dev/example-volume",
+		Writable:       true,
+		FileSystemType: "apfs",
+		FileSystem:     "APFS",
 	}
 )
 
