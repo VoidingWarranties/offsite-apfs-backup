@@ -12,10 +12,8 @@ import (
 )
 
 var (
-	prune = flag.Bool("prune", false, `If false (default), no snapshots are removed from target.
-If true, prune from target the latest snapshot that source and target had in common before the clone.
-Must be false if -incremental is false.`)
-	// TODO: incremental flag
+	prune = flag.Bool("prune", false, `If true, prune from target the latest snapshot that source and target had in common before the clone.
+If false (default), no snapshots are removed from target.`)
 )
 
 func init() {
