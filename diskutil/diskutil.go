@@ -50,12 +50,17 @@ func New(opts ...option) DiskUtil {
 // VolumeInfo describes a local volume. Typically used to identify a volume by
 // UUID, mount point, or device node.
 type VolumeInfo struct {
-	UUID       string `json:"VolumeUUID"`
-	Name       string `json:"VolumeName"`
+	UUID string `json:"VolumeUUID"`
+	Name string `json:"VolumeName"`
+	// e.g. /Volumes/name
 	MountPoint string `json:"MountPoint"`
-	Device     string `json:"DeviceNode"`
-	Writable   bool   `json:"WritableVolume"`
-	FileSystem string `json:"FilesystemType"`
+	// e.g. /dev/disk1s2
+	Device   string `json:"DeviceNode"`
+	Writable bool   `json:"WritableVolume"`
+	// e.g. apfs, hfs.
+	FileSystemType string `json:"FilesystemType"`
+	// e.g. APFS, Case-sensitive APFS.
+	FileSystem string `json:"FilesystemName"`
 }
 
 // Info returns the VolumeInfo of volume. Volume may be a volume name, UUID,

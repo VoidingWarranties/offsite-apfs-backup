@@ -70,7 +70,7 @@ func (c Cloner) CloneableSource(volume string) error {
 	if err != nil {
 		return err
 	}
-	if info.FileSystem != "apfs" {
+	if info.FileSystemType != "apfs" {
 		return fmt.Errorf("%q does not contain an APFS file system", volume)
 	}
 	return nil
@@ -83,7 +83,7 @@ func (c Cloner) CloneableTarget(volume string) error {
 	if err != nil {
 		return err
 	}
-	if info.FileSystem != "apfs" {
+	if info.FileSystemType != "apfs" {
 		return fmt.Errorf("%q does not contain an APFS file system", volume)
 	}
 	if !info.Writable {
