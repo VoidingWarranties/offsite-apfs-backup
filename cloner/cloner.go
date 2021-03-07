@@ -13,15 +13,19 @@ import (
 // Option configures Cloner.
 type Option func(*Cloner)
 
-// Prune, if true, deletes the snapshot that source and target had in common
-// iff a clone is completed successfully.
+// Prune, if true, returns an Option that deletes the snapshot that source and
+// target had in common iff a clone is completed successfully.
 func Prune(prune bool) Option {
 	return func(c *Cloner) {
 		c.prune = prune
 	}
 }
 
-// TODO: document.
+// InitializeTargets, if true, returns an Option that changes the behavior of
+// Clone to do a destructive clone of source's latest snapshot to target,
+// rather than a nondestructive incremental clone. To avoid accidentally
+// deleting data, target must not have any snapshots, otherwise Cloneable and
+// Clone returne errors.
 func InitializeTargets(initTargets bool) Option {
 	return func(c *Cloner) {
 		c.initTargets = initTargets
@@ -92,6 +96,13 @@ func (c Cloner) Cloneable(source string, targets ...string) error {
 	if sourceInfo.FileSystemType != "apfs" {
 		return errors.New("invalid source volume: does not contain an APFS file system")
 	}
+	sourceSnaps, err := c.diskutil.ListSnapshots(sourceInfo)
+	if err != nil {
+		return fmt.Errorf("error listing snapshots of source: %v", err)
+	}
+	if len(sourceSnaps) == 0 {
+		return errors.New("invalid source: no snapshots to clone")
+	}
 
 	if len(targets) == 0 {
 		return errors.New("no targets")
@@ -103,6 +114,9 @@ func (c Cloner) Cloneable(source string, targets ...string) error {
 		if err != nil {
 			return fmt.Errorf("invalid target volume: %v", err)
 		}
+		if sourceInfo.UUID == targetInfo.UUID {
+			return errors.New("source and target must be different volumes")
+		}
 		if duplicate := targetUUIDs[targetInfo.UUID]; duplicate != "" {
 			return fmt.Errorf("invalid target: %q is the same as %q", t, duplicate)
 		}
@@ -110,49 +124,34 @@ func (c Cloner) Cloneable(source string, targets ...string) error {
 		if targetInfo.FileSystemType != "apfs" {
 			return errors.New("invalid target volume: does not contain an APFS file system")
 		}
+		// `asr restore` will restore the target volume to the same file system
+		// as source. To be safe, error here to prevent changing the file
+		// system without the user knowing.
+		if sourceInfo.FileSystem != targetInfo.FileSystem {
+			return fmt.Errorf("invalid source + target combination: source is formatted as %s, but target is formatted as %s", sourceInfo.FileSystem, targetInfo.FileSystem)
+		}
 		if !targetInfo.Writable {
 			return errors.New("invalid target volume: volume not writable")
 		}
-		if err := c.cloneable(sourceInfo, targetInfo); err != nil {
+
+		targetSnaps, err := c.diskutil.ListSnapshots(targetInfo)
+		if err != nil {
+			return fmt.Errorf("error listing snapshots of target: %v", err)
+		}
+		if err := c.cloneable(sourceSnaps, targetSnaps); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// TODO: move all non-snapshot related checks to Cloneable, and only accept
-// snapshots in this function's arguments. That way we only call
-// ListSnapshots(source) once, instead of once per target.
-func (c Cloner) cloneable(source, target diskutil.VolumeInfo) error {
-	// `asr restore` will restore the target volume to the same file system
-	// as source. To be safe, error here to prevent changing the file
-	// system without the user knowing.
-	if source.FileSystem != target.FileSystem {
-		return fmt.Errorf("invalid source + target combination: source is formatted as %s, but target is formatted as %s", source.FileSystem, target.FileSystem)
+func (c Cloner) cloneable(sourceSnaps, targetSnaps []diskutil.Snapshot) error {
+	if !c.initTargets {
+		_, err := latestCommonSnapshot(sourceSnaps, targetSnaps)
+		return err
 	}
-	if source.UUID == target.UUID {
-		return errors.New("source and target must be different volumes")
-	}
-
-	sourceSnaps, err := c.diskutil.ListSnapshots(source)
-	if err != nil {
-		return fmt.Errorf("error listing snapshots of source: %v", err)
-	}
-	targetSnaps, err := c.diskutil.ListSnapshots(target)
-	if err != nil {
-		return fmt.Errorf("error listing snapshots of target: %v", err)
-	}
-	if len(sourceSnaps) == 0 {
-		return errors.New("invalid source: no snapshots to clone")
-	}
-	if c.initTargets {
-		if len(targetSnaps) > 0 {
-			return errors.New("invalid target: target has snapshots - erase the disk before using initialize")
-		}
-	} else {
-		if _, err := latestCommonSnapshot(sourceSnaps, targetSnaps); err != nil {
-			return fmt.Errorf("error finding latest snapshot in common between source and target: %v", err)
-		}
+	if len(targetSnaps) > 0 {
+		return errors.New("invalid target: target has snapshots - erase the disk before using initialize")
 	}
 	return nil
 }
@@ -247,7 +246,7 @@ func (c Cloner) destructiveClone(source, target diskutil.VolumeInfo) error {
 func latestCommonSnapshot(source, target []diskutil.Snapshot) (diskutil.Snapshot, error) {
 	commonSourceI, commonTargetI, exists := latestCommonSnapshotIndices(source, target)
 	if !exists {
-		return diskutil.Snapshot{}, errors.New("no snapshot in common")
+		return diskutil.Snapshot{}, errors.New("source and target have no snapshots in common")
 	}
 	if commonSourceI == 0 && commonTargetI == 0 {
 		return diskutil.Snapshot{}, errors.New("both source and target have the same latest snapshot")
