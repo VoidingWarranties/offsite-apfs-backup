@@ -6,6 +6,8 @@ import (
 	"apfs-snapshot-diff-clone/diskutil"
 )
 
+// TODO: accept *testing.T args instead of returning errors.
+
 type fakeDevices struct {
 	// Map of volume UUID to volume info.
 	volumes map[string]diskutil.VolumeInfo
@@ -180,4 +182,27 @@ func (asr *fakeASR) Restore(source, target diskutil.VolumeInfo, to, from diskuti
 	}
 	target.Name = source.Name
 	return asr.devices.AddVolume(target, snaps...)
+}
+
+func (asr *fakeASR) DestructiveRestore(source, target diskutil.VolumeInfo, to diskutil.Snapshot) error {
+	// Validate source and target volumes exist.
+	if _, err := asr.devices.Volume(source.UUID); err != nil {
+		return err
+	}
+	if _, err := asr.devices.Volume(target.UUID); err != nil {
+		return err
+	}
+	// Valdiate that `to` exists in source.
+	_, err := asr.devices.Snapshot(source.UUID, to.UUID)
+	if err != nil {
+		return err
+	}
+	// Remove target volume to "erase" it.
+	if err := asr.devices.RemoveVolume(target.UUID); err != nil {
+		return err
+	}
+	// Add back the target volume, renamed to source name, and with the
+	// single `to` snapshot.
+	target.Name = source.Name
+	return asr.devices.AddVolume(target, to)
 }

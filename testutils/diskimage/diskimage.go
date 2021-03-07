@@ -19,8 +19,9 @@ import (
 
 // Relative path from testutils to example images.
 const (
-	SourceImg = "testdata/source.dmg"
-	TargetImg = "testdata/target.dmg"
+	SourceImg              = "testdata/source.dmg"
+	TargetImg              = "testdata/target.dmg"
+	UninitializedTargetImg = "testdata/uninitialized_target.dmg"
 
 	HFSImg               = "testdata/hfs.dmg"
 	CaseSensitiveAPFSImg = "testdata/case_sensitive_apfs.dmg"
@@ -59,6 +60,13 @@ var (
 			UUID:    "A175CCCF-0C56-4A46-97FB-CA267A540C96",
 			Created: time.Date(2021, 3, 1, 20, 34, 33, 0, time.UTC),
 		},
+	}
+
+	UninitializedTargetInfo = diskutil.VolumeInfo{
+		Name:           "uninitialized-target",
+		UUID:           "E4317DE2-9CA1-4044-8B63-01FC118EB880",
+		FileSystemType: "apfs",
+		FileSystem:     "APFS",
 	}
 
 	HFSInfo = diskutil.VolumeInfo{

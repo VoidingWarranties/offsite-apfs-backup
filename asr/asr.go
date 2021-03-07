@@ -47,3 +47,23 @@ func (a ASR) Restore(source, target diskutil.VolumeInfo, to, from diskutil.Snaps
 	}
 	return nil
 }
+
+// DestructiveRestore restores the target volume to the source volume's `to`
+// snapshot. `to` must exist in source. target's previous data and snapshots
+// will be lost. Use with caution!
+func (a ASR) DestructiveRestore(source, target diskutil.VolumeInfo, to diskutil.Snapshot) error {
+	cmd := a.execCommand(
+		"asr", "restore",
+		"--source", source.Device,
+		"--target", target.Device,
+		"--toSnapshot", to.UUID,
+		"--erase", "--noprompt")
+	cmd.Stdout = a.osStdout
+	stderr := new(bytes.Buffer)
+	cmd.Stderr = stderr
+	log.Printf("Running command:\n%s", cmd)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("`%s` failed (%w) with stderr: %s", cmd, err, stderr.String())
+	}
+	return nil
+}

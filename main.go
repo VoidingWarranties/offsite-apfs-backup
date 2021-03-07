@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"flag"
 	"fmt"
@@ -13,12 +14,17 @@ import (
 
 var (
 	prune = flag.Bool("prune", false, `If true, prune from target the latest snapshot that source and target had in common before the clone.
-If false (default), no snapshots are removed from target.`)
+If false (default), no snapshots are removed from target.
+Incompatible with -initialize.`)
+	initialize = flag.Bool("initialize", false, `If true, initialize targets to the latest snapshot in source. All data on targets will be lost.
+Set -initialize to true when first setting up an off-site backup volume.
+If false (default), nondestructively clone the latest APFS snapshot in source to targets using the latest snapshot in common.
+Incompatible with -prune.`)
 )
 
 func init() {
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), `Usage: %s [-prune=true] [--] <source volume> <target volume> [<target volume>...]
+		fmt.Fprintf(flag.CommandLine.Output(), `Usage: %s [-prune] [-initialize] [--] <source volume> <target volume> [<target volume>...]
 
   <source volume>
     	Source APFS volume to clone.
@@ -51,10 +57,22 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-	c := cloner.New(cloner.Prune(*prune))
+	c := cloner.New(cloner.Prune(*prune), cloner.InitializeTargets(*initialize))
 	if err := c.Cloneable(source, targets...); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
+	}
+	if err := validateFlags(targets); err != nil {
+		fmt.Fprintln(flag.CommandLine.Output(), "Error:", err)
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	if *initialize{
+		if err := confirmInitialize(source, targets); err != nil {
+			fmt.Fprintln(flag.CommandLine.Output(), "Error:", err)
+			os.Exit(1)
+		}
 	}
 
 	errs := make(map[string]error) // Map of target volume to clone error.
@@ -88,4 +106,31 @@ func parseArguments() (source string, targets []string, err error) {
 		}
 	}
 	return source, targets, nil
+}
+
+func validateFlags(targets []string) error {
+	if *initialize && *prune {
+		return errors.New("-initialize and -prune are incompatible")
+	}
+	return nil
+}
+
+func confirmInitialize(source string, targets []string) error {
+	fmt.Printf("This will delete all data on the following volumes before restoring them to %s's most recent snapshot.\n", source)
+	for _, t := range targets {
+		fmt.Printf("  - %s\n", t)
+	}
+	fmt.Print("This cannot be undone. Are you sure? y/N: ")
+	r := bufio.NewReader(os.Stdin)
+	response, err := r.ReadString('\n')
+	if err != nil {
+		return err
+	}
+	switch strings.ToLower(strings.TrimSpace(response)) {
+	case "y":
+		return nil
+	case "yes":
+		return nil
+	}
+	return errors.New("-initialize confirmation rejected")
 }

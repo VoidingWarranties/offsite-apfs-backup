@@ -21,6 +21,13 @@ func Prune(prune bool) Option {
 	}
 }
 
+// TODO: document.
+func InitializeTargets(initTargets bool) Option {
+	return func(c *Cloner) {
+		c.initTargets = initTargets
+	}
+}
+
 func withDiskUtil(du du) Option {
 	return func(c *Cloner) {
 		c.diskutil = du
@@ -38,6 +45,9 @@ func New(opts ...Option) Cloner {
 	c := Cloner{
 		diskutil: diskutil.New(),
 		asr:      asr.New(),
+
+		prune:       false,
+		initTargets: false,
 	}
 	for _, opt := range opts {
 		opt(&c)
@@ -50,7 +60,8 @@ type Cloner struct {
 	diskutil du
 	asr      restorer
 
-	prune bool
+	prune       bool
+	initTargets bool
 }
 
 type du interface {
@@ -62,6 +73,7 @@ type du interface {
 
 type restorer interface {
 	Restore(source, target diskutil.VolumeInfo, to, from diskutil.Snapshot) error
+	DestructiveRestore(source, target diskutil.VolumeInfo, to diskutil.Snapshot) error
 }
 
 // Cloneable returns nil if source is cloneable to all targets, where cloneable
@@ -108,6 +120,9 @@ func (c Cloner) Cloneable(source string, targets ...string) error {
 	return nil
 }
 
+// TODO: move all non-snapshot related checks to Cloneable, and only accept
+// snapshots in this function's arguments. That way we only call
+// ListSnapshots(source) once, instead of once per target.
 func (c Cloner) cloneable(source, target diskutil.VolumeInfo) error {
 	// `asr restore` will restore the target volume to the same file system
 	// as source. To be safe, error here to prevent changing the file
@@ -127,10 +142,18 @@ func (c Cloner) cloneable(source, target diskutil.VolumeInfo) error {
 	if err != nil {
 		return fmt.Errorf("error listing snapshots of target: %v", err)
 	}
-	if _, err := latestCommonSnapshot(sourceSnaps, targetSnaps); err != nil {
-		return fmt.Errorf("error finding latest snapshot in common between source and target: %v", err)
+	if len(sourceSnaps) == 0 {
+		return errors.New("invalid source: no snapshots to clone")
 	}
-
+	if c.initTargets {
+		if len(targetSnaps) > 0 {
+			return errors.New("invalid target: target has snapshots - erase the disk before using initialize")
+		}
+	} else {
+		if _, err := latestCommonSnapshot(sourceSnaps, targetSnaps); err != nil {
+			return fmt.Errorf("error finding latest snapshot in common between source and target: %v", err)
+		}
+	}
 	return nil
 }
 
@@ -148,35 +171,74 @@ func (c Cloner) Clone(source, target string) error {
 		return fmt.Errorf("error getting volume info of target %q: %v", target, err)
 	}
 
-	sourceSnaps, err := c.diskutil.ListSnapshots(sourceInfo)
-	if err != nil {
-		return fmt.Errorf("error listing snapshots of source %q: %v", source, err)
+	if c.initTargets {
+		if err := c.destructiveClone(sourceInfo, targetInfo); err != nil {
+			return err
+		}
+	} else {
+		if err := c.clone(sourceInfo, targetInfo); err != nil {
+			return err
+		}
 	}
-	targetSnaps, err := c.diskutil.ListSnapshots(targetInfo)
+	// ASR renames the volume to source's name after a restore. Change it
+	// back.
+	if err := c.diskutil.Rename(targetInfo, targetInfo.Name); err != nil {
+		return fmt.Errorf("error renaming volume to original name: %v", err)
+	}
+	return nil
+}
+
+func (c Cloner) clone(source, target diskutil.VolumeInfo) error {
+	sourceSnaps, err := c.diskutil.ListSnapshots(source)
 	if err != nil {
-		return fmt.Errorf("error listing snapshots of target %q: %v", target, err)
+		return fmt.Errorf("error listing snapshots of source: %v", err)
+	}
+	targetSnaps, err := c.diskutil.ListSnapshots(target)
+	if err != nil {
+		return fmt.Errorf("error listing snapshots of target: %v", err)
 	}
 	commonSnap, err := latestCommonSnapshot(sourceSnaps, targetSnaps)
 	if err != nil {
-		return fmt.Errorf("error finding latest snapshot in common between source %q and target %q: %v", source, target, err)
+		return fmt.Errorf("error finding latest snapshot in common between source and target: %v", err)
 	}
 	log.Printf("Found snapshot in common: %s", commonSnap)
 
 	// TODO: document that this relies on the snapshots being in the right order.
 	latestSourceSnap := sourceSnaps[0]
 	log.Printf("Restoring to latest snapshot in source, %s, from common snapshot", latestSourceSnap)
-	if err := c.asr.Restore(sourceInfo, targetInfo, latestSourceSnap, commonSnap); err != nil {
+	if err := c.asr.Restore(source, target, latestSourceSnap, commonSnap); err != nil {
 		return fmt.Errorf("error restoring: %v", err)
-	}
-	if err := c.diskutil.Rename(targetInfo, targetInfo.Name); err != nil {
-		return fmt.Errorf("error renaming volume to original name: %v", err)
 	}
 
 	if c.prune {
 		log.Print("Pruning common snapshot from target...")
-		if err := c.diskutil.DeleteSnapshot(targetInfo, commonSnap); err != nil {
+		if err := c.diskutil.DeleteSnapshot(target, commonSnap); err != nil {
 			return fmt.Errorf("error deleting snapshot %q from target", commonSnap)
 		}
+	}
+	return nil
+}
+
+func (c Cloner) destructiveClone(source, target diskutil.VolumeInfo) error {
+	sourceSnaps, err := c.diskutil.ListSnapshots(source)
+	if err != nil {
+		return fmt.Errorf("error listing snapshots of source: %v", err)
+	}
+	if len(sourceSnaps) == 0 {
+		return errors.New("source does not contain any snapshots")
+	}
+	targetSnaps, err := c.diskutil.ListSnapshots(target)
+	if err != nil {
+		return fmt.Errorf("error listing snapshots of target: %v", err)
+	}
+	if len(targetSnaps) > 0 {
+		return errors.New("aborting because target contains snapshots that would be erased")
+	}
+	// TODO: document that this relies on the snapshots being in the right order.
+	latestSourceSnap := sourceSnaps[0]
+	log.Printf("Restoring to latest snapshot in source, %s", latestSourceSnap)
+	if err := c.asr.DestructiveRestore(source, target, latestSourceSnap); err != nil {
+		return fmt.Errorf("error restoring: %v", err)
 	}
 	return nil
 }
