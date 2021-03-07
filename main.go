@@ -68,7 +68,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *initialize{
+	if *initialize {
 		if err := confirmInitialize(source, targets); err != nil {
 			fmt.Fprintln(flag.CommandLine.Output(), "Error:", err)
 			os.Exit(1)

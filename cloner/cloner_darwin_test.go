@@ -32,7 +32,7 @@ var (
 )
 
 func TestCloneable(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name    string
 		setup   func(*testing.T)
 		opts    []cloner.Option
@@ -40,7 +40,7 @@ func TestCloneable(t *testing.T) {
 		targets []string
 	}{
 		{
-			name:  "incremental clone",
+			name: "incremental clone",
 			setup: func(t *testing.T) {
 				diskimage.MountRO(t, sourceImg)
 				diskimage.MountRW(t, targetImg)
@@ -288,7 +288,7 @@ func TestClone_Errors(t *testing.T) {
 			},
 		},
 		{
-			name:  "initialize targets - target has snaps",
+			name: "initialize targets - target has snaps",
 			setup: func(t *testing.T) (source, target string) {
 				_, sourceDevice := diskimage.MountRO(t, sourceImg)
 				_, targetDevice := diskimage.MountRW(t, targetImg)
@@ -297,7 +297,7 @@ func TestClone_Errors(t *testing.T) {
 			opts: []cloner.Option{cloner.InitializeTargets(true)},
 		},
 		{
-			name:  "initialize targets - source does not have snaps",
+			name: "initialize targets - source does not have snaps",
 			setup: func(t *testing.T) (source, target string) {
 				_, sourceDevice := diskimage.MountRO(t, uninitializedTargetImg)
 				_, targetDevice := diskimage.MountRW(t, targetImg)
