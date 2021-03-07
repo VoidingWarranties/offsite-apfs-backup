@@ -2,17 +2,40 @@ package cloner
 
 import (
 	"errors"
+	"fmt"
+	"testing"
 
 	"apfs-snapshot-diff-clone/diskutil"
 )
-
-// TODO: accept *testing.T args instead of returning errors.
 
 type fakeDevices struct {
 	// Map of volume UUID to volume info.
 	volumes map[string]diskutil.VolumeInfo
 	// Map of volume UUID to snapshots.
 	snapshots map[string][]diskutil.Snapshot
+}
+
+type fakeDevicesOption func(*testing.T, *fakeDevices)
+
+func withFakeVolume(info diskutil.VolumeInfo, snaps ...diskutil.Snapshot) fakeDevicesOption {
+	return func(t *testing.T, d *fakeDevices) {
+		t.Helper()
+		if err := d.AddVolume(info, snaps...); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func newFakeDevices(t *testing.T, opts ...fakeDevicesOption) *fakeDevices {
+	t.Helper()
+	d := &fakeDevices{
+		volumes:   make(map[string]diskutil.VolumeInfo),
+		snapshots: make(map[string][]diskutil.Snapshot),
+	}
+	for _, opt := range opts {
+		opt(t, d)
+	}
+	return d
 }
 
 func (d *fakeDevices) Volume(id string) (diskutil.VolumeInfo, error) {
@@ -26,7 +49,7 @@ func (d *fakeDevices) Volume(id string) (diskutil.VolumeInfo, error) {
 
 func (d *fakeDevices) AddVolume(volume diskutil.VolumeInfo, snapshots ...diskutil.Snapshot) error {
 	if _, exists := d.volumes[volume.UUID]; exists {
-		return errors.New("volume already exists")
+		return fmt.Errorf("volume %q already exists", volume.Name)
 	}
 	d.volumes[volume.UUID] = volume
 	d.snapshots[volume.UUID] = snapshots

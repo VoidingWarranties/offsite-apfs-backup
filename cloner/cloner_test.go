@@ -80,64 +80,46 @@ func TestCloneable(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		setup   func(*testing.T, *fakeDevices)
-		opts    []Option
-		source  string
-		targets []string
+		name        string
+		fakeDevices *fakeDevices
+		opts        []Option
+		source      string
+		targets     []string
 	}{
 		{
 			name: "single target",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(source, latestSnap, commonSnap2, commonSnap1); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(target1, commonSnap1); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(source, latestSnap, commonSnap2, commonSnap1),
+				withFakeVolume(target1, commonSnap1),
+			),
 			source:  source.MountPoint,
 			targets: []string{target1.MountPoint},
 		},
 		{
 			name: "multiple targets",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(source, latestSnap, commonSnap2, commonSnap1); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(target1, commonSnap1); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(target2, commonSnap2); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(source, latestSnap, commonSnap2, commonSnap1),
+				withFakeVolume(target1, commonSnap1),
+				withFakeVolume(target2, commonSnap2),
+			),
 			source:  source.Device,
 			targets: []string{target1.Device, target2.UUID},
 		},
 		{
 			name: "Case-sensitive APFS",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(caseSensitiveSource, latestSnap, commonSnap1); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(caseSensitiveTarget1, commonSnap1); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(caseSensitiveSource, latestSnap, commonSnap1),
+				withFakeVolume(caseSensitiveTarget1, commonSnap1),
+			),
 			source:  caseSensitiveSource.Device,
 			targets: []string{caseSensitiveTarget1.MountPoint},
 		},
 		{
 			name: "initialize target",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(source, latestSnap); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(uninitializedTarget); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(source, latestSnap),
+				withFakeVolume(uninitializedTarget),
+			),
 			opts:    []Option{InitializeTargets(true)},
 			source:  source.Device,
 			targets: []string{uninitializedTarget.Device},
@@ -145,12 +127,7 @@ func TestCloneable(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			d := &fakeDevices{
-				volumes:   make(map[string]diskutil.VolumeInfo),
-				snapshots: make(map[string][]diskutil.Snapshot),
-			}
-			test.setup(t, d)
-			du := &fakeDiskUtil{d}
+			du := &fakeDiskUtil{test.fakeDevices}
 			opts := append([]Option{
 				withDiskUtil(&readonlyFakeDiskUtil{du: du}),
 			}, test.opts...)
@@ -232,185 +209,133 @@ func TestCloneable_Errors(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		setup   func(*testing.T, *fakeDevices)
-		opts    []Option
-		source  string
-		targets []string
+		name        string
+		fakeDevices *fakeDevices
+		opts        []Option
+		source      string
+		targets     []string
 	}{
 		{
 			name: "source not a device",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(target, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(target, commonSnap),
+			),
 			source:  "not-a-volume-uuid",
 			targets: []string{target.UUID},
 		},
 		{
 			name: "one of the targets is not a device",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(source, latestSnap, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(target, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(source, latestSnap, commonSnap),
+				withFakeVolume(target, commonSnap),
+			),
 			source:  source.UUID,
 			targets: []string{target.UUID, "not-a-volume-uuid"},
 		},
 		{
 			name: "same target repeated multiple times",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(source, latestSnap, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(target, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(source, latestSnap, commonSnap),
+				withFakeVolume(target, commonSnap),
+			),
 			source:  source.UUID,
 			targets: []string{target.UUID, target.MountPoint},
 		},
 		{
 			name: "source and target are same",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(source, latestSnap, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(source, latestSnap, commonSnap),
+			),
 			source:  source.UUID,
 			targets: []string{source.MountPoint},
 		},
 		{
 			name: "target has no snapshots in common with source",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(source, latestSnap); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(target, uncommonSnap); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(source, latestSnap),
+				withFakeVolume(target, uncommonSnap),
+			),
 			source:  source.UUID,
 			targets: []string{target.UUID},
 		},
 		{
 			name: "source has no snapshots",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(source); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(target, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(source),
+				withFakeVolume(target, commonSnap),
+			),
 			source:  source.UUID,
 			targets: []string{target.UUID},
 		},
 		{
 			name: "target has no snapshots",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(source, latestSnap, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(target); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(source, latestSnap, commonSnap),
+				withFakeVolume(target),
+			),
 			source:  source.UUID,
 			targets: []string{target.UUID},
 		},
 		{
 			name: "source and target have same latest snapshot",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(source, latestSnap, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(target, latestSnap, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(source, latestSnap, commonSnap),
+				withFakeVolume(target, latestSnap, commonSnap),
+			),
 			source:  source.UUID,
 			targets: []string{target.UUID},
 		},
 		{
 			name: "target snapshot is ahead of latest source snapshot",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(source, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(target, latestSnap, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(source, commonSnap),
+				withFakeVolume(target, latestSnap, commonSnap),
+			),
 			source:  source.UUID,
 			targets: []string{target.UUID},
 		},
 		{
 			name: "source is not an APFS volume",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(hfs); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(target, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(hfs),
+				withFakeVolume(target, commonSnap),
+			),
 			source:  hfs.UUID,
 			targets: []string{target.UUID},
 		},
 		{
 			name: "target is not an APFS volume",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(source, latestSnap, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(hfs); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(source, latestSnap, commonSnap),
+				withFakeVolume(hfs),
+			),
 			source:  source.UUID,
 			targets: []string{hfs.UUID},
 		},
 		{
 			name: "source and target have same filesystem type, but different file systems",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(caseSensitiveAPFS, latestSnap, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(target, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(caseSensitiveAPFS, latestSnap, commonSnap),
+				withFakeVolume(target, commonSnap),
+			),
 			source:  caseSensitiveAPFS.UUID,
 			targets: []string{target.UUID},
 		},
 		{
 			name: "target not writable",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(source, latestSnap, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(readonly, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(source, latestSnap, commonSnap),
+				withFakeVolume(readonly, commonSnap),
+			),
 			source:  source.UUID,
 			targets: []string{readonly.UUID},
 		},
 		{
 			name: "initialize - target has snapshots",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(source, latestSnap, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-				if err := d.AddVolume(uninitializedTarget, commonSnap); err != nil {
-					t.Fatal(err)
-				}
-			},
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(source, latestSnap, commonSnap),
+				withFakeVolume(uninitializedTarget, commonSnap),
+			),
 			opts:    []Option{InitializeTargets(true)},
 			source:  source.Device,
 			targets: []string{uninitializedTarget.Device},
@@ -418,12 +343,7 @@ func TestCloneable_Errors(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			d := &fakeDevices{
-				volumes:   make(map[string]diskutil.VolumeInfo),
-				snapshots: make(map[string][]diskutil.Snapshot),
-			}
-			test.setup(t, d)
-			du := &fakeDiskUtil{d}
+			du := &fakeDiskUtil{test.fakeDevices}
 			opts := append([]Option{
 				withDiskUtil(&readonlyFakeDiskUtil{du: du}),
 			}, test.opts...)
@@ -448,19 +368,19 @@ func TestClone(t *testing.T) {
 	}
 
 	tests := []struct {
-		name   string
-		setup  func(*testing.T, *fakeDevices)
-		opts   []Option
-		source string
-		target string
+		name        string
+		fakeDevices *fakeDevices
+		opts        []Option
+		source      string
+		target      string
 
 		wantSourceSnaps []diskutil.Snapshot
 		wantTargetSnaps []diskutil.Snapshot
 	}{
 		{
 			name: "incremental clone - default options",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",
 						UUID:       "123-foo-uuid",
@@ -468,20 +388,16 @@ func TestClone(t *testing.T) {
 					},
 					snap2,
 					snap1,
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-				if err := d.AddVolume(
+				),
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "bar-name",
 						UUID:       "123-bar-uuid",
 						MountPoint: "/bar/mount/point",
 					},
 					snap1,
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-			},
+				),
+			),
 			source: "/foo/mount/point",
 			target: "/bar/mount/point",
 			wantSourceSnaps: []diskutil.Snapshot{
@@ -495,8 +411,8 @@ func TestClone(t *testing.T) {
 		},
 		{
 			name: "incremental clone - prune target",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",
 						UUID:       "123-foo-uuid",
@@ -504,20 +420,16 @@ func TestClone(t *testing.T) {
 					},
 					snap2,
 					snap1,
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-				if err := d.AddVolume(
+				),
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "bar-name",
 						UUID:       "123-bar-uuid",
 						MountPoint: "/bar/mount/point",
 					},
 					snap1,
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-			},
+				),
+			),
 			opts:   []Option{Prune(true)},
 			source: "/foo/mount/point",
 			target: "/bar/mount/point",
@@ -531,8 +443,8 @@ func TestClone(t *testing.T) {
 		},
 		{
 			name: "initialize clone",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",
 						UUID:       "123-foo-uuid",
@@ -540,19 +452,15 @@ func TestClone(t *testing.T) {
 					},
 					snap2,
 					snap1,
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-				if err := d.AddVolume(
+				),
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "bar-name",
 						UUID:       "123-bar-uuid",
 						MountPoint: "/bar/mount/point",
 					},
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-			},
+				),
+			),
 			opts:   []Option{InitializeTargets(true)},
 			source: "/foo/mount/point",
 			target: "/bar/mount/point",
@@ -567,15 +475,10 @@ func TestClone(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			d := fakeDevices{
-				volumes:   make(map[string]diskutil.VolumeInfo),
-				snapshots: make(map[string][]diskutil.Snapshot),
-			}
-			du := &fakeDiskUtil{&d}
-			test.setup(t, &d)
+			du := &fakeDiskUtil{test.fakeDevices}
 			opts := append([]Option{
 				withDiskUtil(du),
-				withASR(&fakeASR{&d}),
+				withASR(&fakeASR{test.fakeDevices}),
 			}, test.opts...)
 			c := New(opts...)
 			if err := c.Clone(test.source, test.target); err != nil {
@@ -626,16 +529,16 @@ func TestClone_Errors(t *testing.T) {
 	}
 
 	tests := []struct {
-		name   string
-		setup  func(*testing.T, *fakeDevices)
-		opts   []Option
-		source string
-		target string
+		name        string
+		fakeDevices *fakeDevices
+		opts        []Option
+		source      string
+		target      string
 	}{
 		{
 			name: "source not found",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",
 						UUID:       "123-foo-uuid",
@@ -643,17 +546,15 @@ func TestClone_Errors(t *testing.T) {
 					},
 					snap2,
 					snap1,
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-			},
+				),
+			),
 			source: "/not/a/volume",
 			target: "foo/mount/point",
 		},
 		{
 			name: "target not found",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",
 						UUID:       "123-foo-uuid",
@@ -661,42 +562,36 @@ func TestClone_Errors(t *testing.T) {
 					},
 					snap2,
 					snap1,
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-			},
+				),
+			),
 			source: "/foo/mount/point",
 			target: "/not/a/volume",
 		},
 		{
 			name: "incremental - no snapshots",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",
 						UUID:       "123-foo-uuid",
 						MountPoint: "/foo/mount/point",
 					},
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-				if err := d.AddVolume(
+				),
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "bar-name",
 						UUID:       "123-bar-uuid",
 						MountPoint: "/bar/mount/point",
 					},
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-			},
+				),
+			),
 			source: "/foo/mount/point",
 			target: "/bar/mount/point",
 		},
 		{
 			name: "incremental - same latest snapshot",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",
 						UUID:       "123-foo-uuid",
@@ -704,10 +599,8 @@ func TestClone_Errors(t *testing.T) {
 					},
 					snap2,
 					snap1,
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-				if err := d.AddVolume(
+				),
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "bar-name",
 						UUID:       "123-bar-uuid",
@@ -715,70 +608,60 @@ func TestClone_Errors(t *testing.T) {
 					},
 					snap2,
 					snap1,
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-			},
+				),
+			),
 			source: "/foo/mount/point",
 			target: "/bar/mount/point",
 		},
 		{
 			name: "incremental - no snapshots in common",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",
 						UUID:       "123-foo-uuid",
 						MountPoint: "/foo/mount/point",
 					},
 					snap1,
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-				if err := d.AddVolume(
+				),
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "bar-name",
 						UUID:       "123-bar-uuid",
 						MountPoint: "/bar/mount/point",
 					},
 					snap2,
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-			},
+				),
+			),
 			source: "/foo/mount/point",
 			target: "/bar/mount/point",
 		},
 		{
 			name: "initialize - no source snaps",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",
 						UUID:       "123-foo-uuid",
 						MountPoint: "/foo/mount/point",
 					},
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-				if err := d.AddVolume(
+				),
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "bar-name",
 						UUID:       "123-bar-uuid",
 						MountPoint: "/bar/mount/point",
 					},
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-			},
+				),
+			),
 			opts:   []Option{InitializeTargets(true)},
 			source: "/foo/mount/point",
 			target: "/bar/mount/point",
 		},
 		{
 			name: "initialize - target has snaps",
-			setup: func(t *testing.T, d *fakeDevices) {
-				if err := d.AddVolume(
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "foo-name",
 						UUID:       "123-foo-uuid",
@@ -786,20 +669,16 @@ func TestClone_Errors(t *testing.T) {
 					},
 					snap2,
 					snap1,
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-				if err := d.AddVolume(
+				),
+				withFakeVolume(
 					diskutil.VolumeInfo{
 						Name:       "bar-name",
 						UUID:       "123-bar-uuid",
 						MountPoint: "/bar/mount/point",
 					},
 					snap1,
-				); err != nil {
-					t.Fatalf("error adding volume: %v", err)
-				}
-			},
+				),
+			),
 			opts:   []Option{InitializeTargets(true)},
 			source: "/foo/mount/point",
 			target: "/bar/mount/point",
@@ -807,15 +686,10 @@ func TestClone_Errors(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			d := fakeDevices{
-				volumes:   make(map[string]diskutil.VolumeInfo),
-				snapshots: make(map[string][]diskutil.Snapshot),
-			}
-			test.setup(t, &d)
 			opts := append([]Option{
 				// readonly so that test panics if any modifying methods are called.
 				withDiskUtil(&readonlyFakeDiskUtil{
-					du: &fakeDiskUtil{&d},
+					du: &fakeDiskUtil{test.fakeDevices},
 				}),
 				// nil so that test panics if asr is called.
 				withASR(nil),
