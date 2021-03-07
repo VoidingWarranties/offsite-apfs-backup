@@ -13,18 +13,15 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-var (
-	sourceImg = filepath.Join("../testutils/diskimage", diskimage.SourceImg)
-	targetImg = filepath.Join("../testutils/diskimage", diskimage.TargetImg)
-)
+var mounter = diskimage.Mounter{
+	Relpath: "../testutils/diskimage",
+}
 
 func TestRestore(t *testing.T) {
-	source := diskimage.SourceInfo
-	target := diskimage.TargetInfo
-	source.MountPoint, source.Device = diskimage.MountRO(t, sourceImg)
-	target.MountPoint, target.Device = diskimage.MountRW(t, targetImg)
-	to := diskimage.SourceSnaps[0]
-	from := diskimage.SourceSnaps[1]
+	source := mounter.MountRO(t, diskimage.SourceImg)
+	target := mounter.MountRW(t, diskimage.TargetImg)
+	to := diskimage.SourceImg.Snapshots(t)[0]
+	from := diskimage.SourceImg.Snapshots(t)[1]
 
 	r := asr.New()
 	if err := r.Restore(source, target, to, from); err != nil {
@@ -36,7 +33,7 @@ func TestRestore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := diskimage.SourceSnaps[:]
+	want := diskimage.SourceImg.Snapshots(t)[:]
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("Restore resulted in unexpected snapshots in target. -want +got:\n%s", diff)
 	}
@@ -60,18 +57,16 @@ func TestRestore_Errors(t *testing.T) {
 					MountPoint: badMountPoint,
 					Device:     badDevice,
 				}
-				target = diskimage.TargetInfo
-				target.MountPoint, target.Device = diskimage.MountRW(t, targetImg)
+				target = mounter.MountRW(t, diskimage.TargetImg)
 				return source, target
 			},
-			to:   diskimage.SourceSnaps[0],
-			from: diskimage.SourceSnaps[1],
+			to:   diskimage.SourceImg.Snapshots(t)[0],
+			from: diskimage.SourceImg.Snapshots(t)[1],
 		},
 		{
 			name: "target not found",
 			setup: func(t *testing.T) (source, target diskutil.VolumeInfo) {
-				source = diskimage.TargetInfo
-				source.MountPoint, source.Device = diskimage.MountRO(t, sourceImg)
+				source = mounter.MountRO(t, diskimage.SourceImg)
 				badMountPoint := t.TempDir()
 				badDevice := filepath.Join(badMountPoint, "notadevice")
 				target = diskutil.VolumeInfo{
@@ -82,46 +77,40 @@ func TestRestore_Errors(t *testing.T) {
 				}
 				return source, target
 			},
-			to:   diskimage.SourceSnaps[0],
-			from: diskimage.SourceSnaps[1],
+			to:   diskimage.SourceImg.Snapshots(t)[0],
+			from: diskimage.SourceImg.Snapshots(t)[1],
 		},
 		{
 			name: "to snapshot not found on source",
 			setup: func(t *testing.T) (source, target diskutil.VolumeInfo) {
-				source = diskimage.SourceInfo
-				target = diskimage.TargetInfo
-				source.MountPoint, source.Device = diskimage.MountRO(t, sourceImg)
-				target.MountPoint, target.Device = diskimage.MountRW(t, targetImg)
+				source = mounter.MountRO(t, diskimage.SourceImg)
+				target = mounter.MountRW(t, diskimage.TargetImg)
 				return source, target
 			},
 			to: diskutil.Snapshot{
 				Name: "not-a-snapshot",
 				UUID: "not-a-uuid",
 			},
-			from: diskimage.SourceSnaps[1],
+			from: diskimage.SourceImg.Snapshots(t)[1],
 		},
 		{
 			name: "to and from are same",
 			setup: func(t *testing.T) (source, target diskutil.VolumeInfo) {
-				source = diskimage.SourceInfo
-				target = diskimage.TargetInfo
-				source.MountPoint, source.Device = diskimage.MountRO(t, sourceImg)
-				target.MountPoint, target.Device = diskimage.MountRW(t, targetImg)
+				source = mounter.MountRO(t, diskimage.SourceImg)
+				target = mounter.MountRW(t, diskimage.TargetImg)
 				return source, target
 			},
-			to:   diskimage.SourceSnaps[1],
-			from: diskimage.SourceSnaps[1],
+			to:   diskimage.SourceImg.Snapshots(t)[1],
+			from: diskimage.SourceImg.Snapshots(t)[1],
 		},
 		{
 			name: "from snapshot not found on source or target",
 			setup: func(t *testing.T) (source, target diskutil.VolumeInfo) {
-				source = diskimage.SourceInfo
-				target = diskimage.TargetInfo
-				source.MountPoint, source.Device = diskimage.MountRO(t, sourceImg)
-				target.MountPoint, target.Device = diskimage.MountRW(t, targetImg)
+				source = mounter.MountRO(t, diskimage.SourceImg)
+				target = mounter.MountRW(t, diskimage.TargetImg)
 				return source, target
 			},
-			to: diskimage.SourceSnaps[0],
+			to: diskimage.SourceImg.Snapshots(t)[0],
 			from: diskutil.Snapshot{
 				Name: "not-a-snapshot",
 				UUID: "not-a-uuid",
@@ -130,24 +119,21 @@ func TestRestore_Errors(t *testing.T) {
 		{
 			name: "source and target are same",
 			setup: func(t *testing.T) (source, target diskutil.VolumeInfo) {
-				source = diskimage.SourceInfo
-				source.MountPoint, source.Device = diskimage.MountRO(t, sourceImg)
-				return source, source
+				info := mounter.MountRW(t, diskimage.SourceImg)
+				return info, info
 			},
-			to:   diskimage.SourceSnaps[0],
-			from: diskimage.SourceSnaps[1],
+			to:   diskimage.SourceImg.Snapshots(t)[0],
+			from: diskimage.SourceImg.Snapshots(t)[1],
 		},
 		{
 			name: "target readonly",
 			setup: func(t *testing.T) (source, target diskutil.VolumeInfo) {
-				source = diskimage.SourceInfo
-				target = diskimage.TargetInfo
-				source.MountPoint, source.Device = diskimage.MountRO(t, sourceImg)
-				target.MountPoint, target.Device = diskimage.MountRO(t, targetImg)
+				source = mounter.MountRO(t, diskimage.SourceImg)
+				target = mounter.MountRO(t, diskimage.TargetImg)
 				return source, target
 			},
-			to:   diskimage.SourceSnaps[0],
-			from: diskimage.SourceSnaps[1],
+			to:   diskimage.SourceImg.Snapshots(t)[0],
+			from: diskimage.SourceImg.Snapshots(t)[1],
 		},
 	}
 	for _, test := range tests {

@@ -4,6 +4,9 @@
 // well as volume and snapshot metadata for the disk images in testdata/.
 // Images are mounted in a temporary directory, and automatically unmounted
 // during test cleanup.
+//
+// All VolumeInfo and Snapshot metadata are constructed independently, and
+// therefore suitable for testing the diskutil package.
 package diskimage
 
 import (
@@ -18,71 +21,152 @@ import (
 	"apfs-snapshot-diff-clone/plutil"
 )
 
-// Relative path from testutils to example images.
+// Testdata disk images:
 const (
-	SourceImg              = "testdata/source.dmg"
-	TargetImg              = "testdata/target.dmg"
-	UninitializedTargetImg = "testdata/uninitialized_target.dmg"
+	// SourceImg is an example source volume that has multiple snapshots.
+	SourceImg DiskImage = "testdata/source.dmg"
+	// TargetImg is an example target volume that has a snapshot in common
+	// with SourceImg.
+	TargetImg DiskImage = "testdata/target.dmg"
+	// UninitializedTargetImg is an example target volume that has no
+	// snapshots.
+	UninitializedTargetImg DiskImage = "testdata/uninitialized_target.dmg"
 
-	HFSImg               = "testdata/hfs.dmg"
-	CaseSensitiveAPFSImg = "testdata/case_sensitive_apfs.dmg"
+	// Non-APFS file systems.
+	CaseSensitiveAPFSImg DiskImage = "testdata/case_sensitive_apfs.dmg"
+	HFSImg               DiskImage = "testdata/hfs.dmg"
 )
 
 // Expected metadata for each example image.
 var (
-	SourceInfo = diskutil.VolumeInfo{
-		Name:           "source",
-		UUID:           "CA79DDFA-D75D-43F3-8099-3BEA2F7C1F33",
-		FileSystemType: "apfs",
-		FileSystem:     "APFS",
-	}
-	SourceSnaps = [...]diskutil.Snapshot{
-		{
-			Name:    "com.bombich.ccc.6AE4815C-1F9A-4D5E-86E1-19078BE01958.2021-03-01-203509",
-			UUID:    "D1ABE254-5B1B-4FDF-8DB3-1B4B4B825E39",
-			Created: time.Date(2021, 3, 1, 20, 35, 9, 0, time.UTC),
+	infos = map[DiskImage]diskutil.VolumeInfo{
+		SourceImg: diskutil.VolumeInfo{
+			Name:           "source",
+			UUID:           "CA79DDFA-D75D-43F3-8099-3BEA2F7C1F33",
+			FileSystemType: "apfs",
+			FileSystem:     "APFS",
 		},
-		{
-			Name:    "com.bombich.ccc.D7B2D286-3CE0-40B9-9797-EBF108ADAD30.2021-03-01-203433",
-			UUID:    "A175CCCF-0C56-4A46-97FB-CA267A540C96",
-			Created: time.Date(2021, 3, 1, 20, 34, 33, 0, time.UTC),
+		TargetImg: diskutil.VolumeInfo{
+			Name:           "target",
+			UUID:           "21CF5985-FA46-42AF-9872-52CDE74B04DE",
+			FileSystemType: "apfs",
+			FileSystem:     "APFS",
+		},
+		UninitializedTargetImg: diskutil.VolumeInfo{
+			Name:           "uninitialized-target",
+			UUID:           "E4317DE2-9CA1-4044-8B63-01FC118EB880",
+			FileSystemType: "apfs",
+			FileSystem:     "APFS",
+		},
+		HFSImg: diskutil.VolumeInfo{
+			Name:           "hfs",
+			UUID:           "4F5B6053-AB58-3899-A263-F00D22575F69",
+			FileSystemType: "hfs",
+			FileSystem:     "HFS+",
+		},
+		CaseSensitiveAPFSImg: diskutil.VolumeInfo{
+			Name:           "case-sensitive-apfs",
+			UUID:           "8969062E-E518-4591-9DEE-1DB5B16AB9DE",
+			FileSystemType: "apfs",
+			FileSystem:     "Case-sensitive APFS",
 		},
 	}
-
-	TargetInfo = diskutil.VolumeInfo{
-		Name:           "target",
-		UUID:           "21CF5985-FA46-42AF-9872-52CDE74B04DE",
-		FileSystemType: "apfs",
-		FileSystem:     "APFS",
-	}
-	TargetSnaps = [...]diskutil.Snapshot{
-		{
-			Name:    "com.bombich.ccc.D7B2D286-3CE0-40B9-9797-EBF108ADAD30.2021-03-01-203433",
-			UUID:    "A175CCCF-0C56-4A46-97FB-CA267A540C96",
-			Created: time.Date(2021, 3, 1, 20, 34, 33, 0, time.UTC),
+	snapshots = map[DiskImage][]diskutil.Snapshot{
+		SourceImg: []diskutil.Snapshot{
+			{
+				Name:    "com.bombich.ccc.6AE4815C-1F9A-4D5E-86E1-19078BE01958.2021-03-01-203509",
+				UUID:    "D1ABE254-5B1B-4FDF-8DB3-1B4B4B825E39",
+				Created: time.Date(2021, 3, 1, 20, 35, 9, 0, time.UTC),
+			},
+			{
+				Name:    "com.bombich.ccc.D7B2D286-3CE0-40B9-9797-EBF108ADAD30.2021-03-01-203433",
+				UUID:    "A175CCCF-0C56-4A46-97FB-CA267A540C96",
+				Created: time.Date(2021, 3, 1, 20, 34, 33, 0, time.UTC),
+			},
 		},
-	}
-
-	UninitializedTargetInfo = diskutil.VolumeInfo{
-		Name:           "uninitialized-target",
-		UUID:           "E4317DE2-9CA1-4044-8B63-01FC118EB880",
-		FileSystemType: "apfs",
-		FileSystem:     "APFS",
-	}
-
-	HFSInfo = diskutil.VolumeInfo{
-		Name:           "hfs",
-		UUID:           "4F5B6053-AB58-3899-A263-F00D22575F69",
-		FileSystemType: "hfs",
-		FileSystem:     "HFS+",
-	}
-	CaseSensitiveAPFSInfo = diskutil.VolumeInfo{
-		Name:           "case-sensitive-apfs",
-		UUID:           "8969062E-E518-4591-9DEE-1DB5B16AB9DE",
-		FileSystemType: "apfs",
-		FileSystem:     "Case-sensitive APFS",
+		TargetImg: []diskutil.Snapshot{
+			{
+				Name:    "com.bombich.ccc.D7B2D286-3CE0-40B9-9797-EBF108ADAD30.2021-03-01-203433",
+				UUID:    "A175CCCF-0C56-4A46-97FB-CA267A540C96",
+				Created: time.Date(2021, 3, 1, 20, 34, 33, 0, time.UTC),
+			},
+		},
 	}
 )
+
+// Mounter mounts testdata disk images by constructing their path from the
+// relative path to the diskimage package, Relpath.
+type Mounter struct {
+	// Relpath should be the relative path to this package from the test
+	// being executed. For example, a test in the cloner package would set
+	// Relpath to "../testutils/diskimage".
+	Relpath string
+}
+
+// MountRO is similar to the top-level function, MountRO, but it a)
+// automatically constructs the path to the given image using the relative
+// path, Mounter.Relpath, to the diskimage package, and b) returns the full
+// VolumeInfo, rather than just mount point and device node.
+func (m Mounter) MountRO(t *testing.T, img DiskImage) diskutil.VolumeInfo {
+	t.Helper()
+	return img.mountRO(t, m.Relpath)
+}
+
+// MountRW is similar to the top-level function, MountRW, but it a)
+// automatically constructs the path to the given image using the relative
+// path, Mounter.Relpath, to the diskimage package, and b) returns the full
+// VolumeInfo, rather than just mount point and device node.
+func (m Mounter) MountRW(t *testing.T, img DiskImage) diskutil.VolumeInfo {
+	t.Helper()
+	return img.mountRW(t, m.Relpath)
+}
+
+// DiskImage is a testdata disk image. The value is a relative path from this
+// package to the disk image.
+type DiskImage string
+
+func (img DiskImage) mountRO(t *testing.T, relpath string) diskutil.VolumeInfo {
+	t.Helper()
+	info, exists := infos[img]
+	if !exists {
+		t.Fatalf("unknown disk image %q", img)
+	}
+	path := filepath.Join(relpath, string(img))
+	info.MountPoint, info.Device = MountRO(t, path)
+	info.Writable = false
+	return info
+}
+
+func (img DiskImage) mountRW(t *testing.T, relpath string) diskutil.VolumeInfo {
+	t.Helper()
+	info, exists := infos[img]
+	if !exists {
+		t.Fatalf("unknown disk image %q", img)
+	}
+	path := filepath.Join(relpath, string(img))
+	info.MountPoint, info.Device = MountRW(t, path)
+	info.Writable = true
+	return info
+}
+
+// UUID returns the volume UUID of the disk image.
+func (img DiskImage) UUID(t *testing.T) string {
+	t.Helper()
+	info, exists := infos[img]
+	if !exists {
+		t.Fatalf("unknown disk image %q", img)
+	}
+	return info.UUID
+}
+
+// Snapshots returns the APFS snapshots of the disk image.
+func (img DiskImage) Snapshots(t *testing.T) []diskutil.Snapshot {
+	snaps, exists := snapshots[img]
+	if !exists {
+		t.Fatalf("no snapshot information for disk image %q", img)
+	}
+	return snaps
+}
 
 // MountRO mounts the disk image at `path` as a readonly volume and
 // returns the mount point and device node.

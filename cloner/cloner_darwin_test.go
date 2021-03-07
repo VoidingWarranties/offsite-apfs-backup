@@ -3,7 +3,6 @@
 package cloner_test
 
 import (
-	"path/filepath"
 	"testing"
 
 	"apfs-snapshot-diff-clone/cloner"
@@ -14,22 +13,9 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
-var (
-	sourceImg              = filepath.Join("../testutils/diskimage", diskimage.SourceImg)
-	targetImg              = filepath.Join("../testutils/diskimage", diskimage.TargetImg)
-	uninitializedTargetImg = filepath.Join("../testutils/diskimage", diskimage.UninitializedTargetImg)
-	hfsImg                 = filepath.Join("../testutils/diskimage", diskimage.HFSImg)
-	caseSensitiveAPFSImg   = filepath.Join("../testutils/diskimage", diskimage.CaseSensitiveAPFSImg)
-
-	sourceInfo              = diskimage.SourceInfo
-	targetInfo              = diskimage.TargetInfo
-	uninitializedTargetInfo = diskimage.UninitializedTargetInfo
-	hfsInfo                 = diskimage.HFSInfo
-	caseSensitiveAPFSInfo   = diskimage.CaseSensitiveAPFSInfo
-
-	sourceSnaps = diskimage.SourceSnaps
-	targetSnaps = diskimage.TargetSnaps
-)
+var mounter = diskimage.Mounter{
+	Relpath: "../testutils/diskimage",
+}
 
 func TestCloneable(t *testing.T) {
 	tests := []struct {
@@ -42,21 +28,21 @@ func TestCloneable(t *testing.T) {
 		{
 			name: "incremental clone",
 			setup: func(t *testing.T) {
-				diskimage.MountRO(t, sourceImg)
-				diskimage.MountRW(t, targetImg)
+				mounter.MountRO(t, diskimage.SourceImg)
+				mounter.MountRW(t, diskimage.TargetImg)
 			},
-			source:  sourceInfo.UUID,
-			targets: []string{targetInfo.UUID},
+			source:  diskimage.SourceImg.UUID(t),
+			targets: []string{diskimage.TargetImg.UUID(t)},
 		},
 		{
 			name: "initialize targets",
 			setup: func(t *testing.T) {
-				diskimage.MountRO(t, sourceImg)
-				diskimage.MountRW(t, uninitializedTargetImg)
+				mounter.MountRO(t, diskimage.SourceImg)
+				mounter.MountRW(t, diskimage.UninitializedTargetImg)
 			},
 			opts:    []cloner.Option{cloner.InitializeTargets(true)},
-			source:  sourceInfo.UUID,
-			targets: []string{uninitializedTargetInfo.UUID},
+			source:  diskimage.SourceImg.UUID(t),
+			targets: []string{diskimage.UninitializedTargetImg.UUID(t)},
 		},
 	}
 	for _, test := range tests {
@@ -81,73 +67,76 @@ func TestCloneable_Errors(t *testing.T) {
 		{
 			name: "source not a volume",
 			setup: func(t *testing.T) {
-				diskimage.MountRW(t, targetImg)
+				mounter.MountRW(t, diskimage.TargetImg)
 			},
 			source:  "not-a-uuid",
-			targets: []string{targetInfo.UUID},
+			targets: []string{diskimage.TargetImg.UUID(t)},
 		},
 		{
 			name: "one of the targets is not a volume",
 			setup: func(t *testing.T) {
-				diskimage.MountRO(t, sourceImg)
-				diskimage.MountRW(t, targetImg)
+				mounter.MountRO(t, diskimage.SourceImg)
+				mounter.MountRW(t, diskimage.TargetImg)
 			},
-			source:  sourceInfo.UUID,
-			targets: []string{targetInfo.UUID, "not-a-uuid"},
+			source:  diskimage.SourceImg.UUID(t),
+			targets: []string{diskimage.TargetImg.UUID(t), "not-a-uuid"},
 		},
 		{
 			name: "same target repeated multiple times",
 			setup: func(t *testing.T) {
-				diskimage.MountRO(t, sourceImg)
-				diskimage.MountRW(t, targetImg)
+				mounter.MountRO(t, diskimage.SourceImg)
+				mounter.MountRW(t, diskimage.TargetImg)
 			},
-			source:  sourceInfo.UUID,
-			targets: []string{targetInfo.UUID, targetInfo.UUID},
+			source: diskimage.SourceImg.UUID(t),
+			targets: []string{
+				diskimage.TargetImg.UUID(t),
+				diskimage.TargetImg.UUID(t),
+			},
 		},
 		{
 			name: "source and target are same",
 			setup: func(t *testing.T) {
-				diskimage.MountRO(t, sourceImg)
+				mounter.MountRO(t, diskimage.SourceImg)
 			},
-			source:  sourceInfo.UUID,
-			targets: []string{sourceInfo.UUID},
+			source:  diskimage.SourceImg.UUID(t),
+			targets: []string{diskimage.SourceImg.UUID(t)},
 		},
 		{
 			name: "target not writable",
 			setup: func(t *testing.T) {
-				diskimage.MountRO(t, sourceImg)
-				diskimage.MountRO(t, targetImg)
+				mounter.MountRO(t, diskimage.SourceImg)
+				mounter.MountRO(t, diskimage.TargetImg)
 			},
-			source:  sourceInfo.UUID,
-			targets: []string{targetInfo.UUID},
+			source:  diskimage.SourceImg.UUID(t),
+			targets: []string{diskimage.TargetImg.UUID(t)},
 		},
 		{
 			name: "target not an APFS volume",
 			setup: func(t *testing.T) {
-				diskimage.MountRO(t, sourceImg)
-				diskimage.MountRW(t, hfsImg)
+				mounter.MountRO(t, diskimage.SourceImg)
+				mounter.MountRW(t, diskimage.HFSImg)
 			},
-			source:  sourceInfo.UUID,
-			targets: []string{hfsInfo.UUID},
+			source:  diskimage.SourceImg.UUID(t),
+			targets: []string{diskimage.HFSImg.UUID(t)},
 		},
 		{
 			name: "target is case sensitive, but source is not",
 			setup: func(t *testing.T) {
-				diskimage.MountRO(t, sourceImg)
-				diskimage.MountRW(t, caseSensitiveAPFSImg)
+				mounter.MountRO(t, diskimage.SourceImg)
+				mounter.MountRW(t, diskimage.CaseSensitiveAPFSImg)
 			},
-			source:  sourceInfo.UUID,
-			targets: []string{caseSensitiveAPFSInfo.UUID},
+			source:  diskimage.SourceImg.UUID(t),
+			targets: []string{diskimage.CaseSensitiveAPFSImg.UUID(t)},
 		},
 		{
 			name: "initialize - target has snaps",
 			setup: func(t *testing.T) {
-				diskimage.MountRO(t, sourceImg)
-				diskimage.MountRW(t, targetImg)
+				mounter.MountRO(t, diskimage.SourceImg)
+				mounter.MountRW(t, diskimage.TargetImg)
 			},
 			opts:    []cloner.Option{cloner.InitializeTargets(true)},
-			source:  sourceInfo.UUID,
-			targets: []string{targetInfo.UUID},
+			source:  diskimage.SourceImg.UUID(t),
+			targets: []string{diskimage.TargetImg.UUID(t)},
 		},
 	}
 	for _, test := range tests {
@@ -171,21 +160,21 @@ func TestClone_Incremental(t *testing.T) {
 		{
 			name: "default options",
 			setup: func(t *testing.T) (source, target string) {
-				_, sourceDevice := diskimage.MountRO(t, sourceImg)
-				_, targetDevice := diskimage.MountRW(t, targetImg)
-				return sourceDevice, targetDevice
+				sourceInfo := mounter.MountRO(t, diskimage.SourceImg)
+				targetInfo := mounter.MountRW(t, diskimage.TargetImg)
+				return sourceInfo.Device, targetInfo.Device
 			},
-			wantTargetSnaps: sourceSnaps[:],
+			wantTargetSnaps: diskimage.SourceImg.Snapshots(t),
 		},
 		{
 			name: "prune",
 			opts: []cloner.Option{cloner.Prune(true)},
 			setup: func(t *testing.T) (source, target string) {
-				_, sourceDevice := diskimage.MountRO(t, sourceImg)
-				_, targetDevice := diskimage.MountRW(t, targetImg)
-				return sourceDevice, targetDevice
+				sourceInfo := mounter.MountRO(t, diskimage.SourceImg)
+				targetInfo := mounter.MountRW(t, diskimage.TargetImg)
+				return sourceInfo.Device, targetInfo.Device
 			},
-			wantTargetSnaps: sourceSnaps[:1],
+			wantTargetSnaps: diskimage.SourceImg.Snapshots(t)[:1],
 		},
 	}
 	for _, test := range tests {
@@ -229,8 +218,8 @@ func TestClone_Incremental(t *testing.T) {
 }
 
 func TestClone_InitializeTargets(t *testing.T) {
-	_, source := diskimage.MountRO(t, sourceImg)
-	_, target := diskimage.MountRW(t, uninitializedTargetImg)
+	source := mounter.MountRO(t, diskimage.SourceImg).Device
+	target := mounter.MountRW(t, diskimage.UninitializedTargetImg).Device
 
 	du := diskutil.New()
 	wantTargetInfo, err := du.Info(target)
@@ -265,7 +254,7 @@ func TestClone_InitializeTargets(t *testing.T) {
 			t.Fatal(err)
 		}
 		wantTargetSnaps := []diskutil.Snapshot{
-			sourceSnaps[0],
+			diskimage.SourceImg.Snapshots(t)[0],
 		}
 		if diff := cmp.Diff(wantTargetSnaps, gotTargetSnaps); diff != "" {
 			t.Errorf("Clone resulted in unexpected target snapshots. -want +got:\n%s", diff)
@@ -282,26 +271,26 @@ func TestClone_Errors(t *testing.T) {
 		{
 			name: "source and target swapped",
 			setup: func(t *testing.T) (source, target string) {
-				_, sourceDevice := diskimage.MountRO(t, targetImg)
-				_, targetDevice := diskimage.MountRW(t, sourceImg)
-				return sourceDevice, targetDevice
+				sourceInfo := mounter.MountRO(t, diskimage.TargetImg)
+				targetInfo := mounter.MountRW(t, diskimage.SourceImg)
+				return sourceInfo.Device, targetInfo.Device
 			},
 		},
 		{
 			name: "initialize targets - target has snaps",
 			setup: func(t *testing.T) (source, target string) {
-				_, sourceDevice := diskimage.MountRO(t, sourceImg)
-				_, targetDevice := diskimage.MountRW(t, targetImg)
-				return sourceDevice, targetDevice
+				sourceInfo := mounter.MountRO(t, diskimage.SourceImg)
+				targetInfo := mounter.MountRW(t, diskimage.TargetImg)
+				return sourceInfo.Device, targetInfo.Device
 			},
 			opts: []cloner.Option{cloner.InitializeTargets(true)},
 		},
 		{
 			name: "initialize targets - source does not have snaps",
 			setup: func(t *testing.T) (source, target string) {
-				_, sourceDevice := diskimage.MountRO(t, uninitializedTargetImg)
-				_, targetDevice := diskimage.MountRW(t, targetImg)
-				return sourceDevice, targetDevice
+				sourceInfo := mounter.MountRO(t, diskimage.UninitializedTargetImg)
+				targetInfo := mounter.MountRW(t, diskimage.TargetImg)
+				return sourceInfo.Device, targetInfo.Device
 			},
 			opts: []cloner.Option{cloner.InitializeTargets(true)},
 		},
