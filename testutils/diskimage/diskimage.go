@@ -8,6 +8,7 @@ package diskimage
 
 import (
 	"errors"
+	"fmt"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -118,13 +119,8 @@ func MountRO(t *testing.T, path string) (mountpoint, device string) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		cmd := exec.Command("hdiutil", "detach", "-force", device)
-		err := cmd.Run()
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			t.Fatalf("failed to unmount %q: %v: %s", device, err, exitErr.Stderr)
-		}
-		if err != nil {
-			t.Fatalf("failed to unmount %q: %v", device, err)
+		if err := detach(device); err != nil {
+			t.Fatal(err)
 		}
 	})
 	// t.TempDir can return a path that contains a symlink. Evaluate the
@@ -167,13 +163,8 @@ func MountRW(t *testing.T, path string) (mountpoint, device string) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		cmd := exec.Command("hdiutil", "detach", "-force", device)
-		err := cmd.Run()
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			t.Fatalf("failed to unmount %q: %v: %s", device, err, exitErr.Stderr)
-		}
-		if err != nil {
-			t.Fatalf("failed to unmount %q: %v", device, err)
+		if err := detach(device); err != nil {
+			t.Fatal(err)
 		}
 	})
 	mountpoint, err = filepath.EvalSymlinks(mountpoint)
@@ -207,4 +198,26 @@ func parseHdiutilAttachOutput(stdout []byte) (device string, err error) {
 		device = e.DevEntry
 	}
 	return device, nil
+}
+
+// detach the device, retrying up to 2 additional times (with a small
+// increasing delay) if there are errors. The retry is necessary because
+// sometimes `hdiutil detach` complains that the device is busy and cannot
+// detach. Not the best solution, but better than flaky tests.
+func detach(device string) error {
+	const maxAttempts = 3
+	const initialDelay = time.Second
+	var err error
+	for i := 0; i < maxAttempts; i++ {
+		time.Sleep(time.Duration(i) * initialDelay)
+		cmd := exec.Command("hdiutil", "detach", "-force", device)
+		err = cmd.Run()
+		if err == nil {
+			return nil
+		}
+	}
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		return fmt.Errorf("failed to unmount %q after %d tries: %v: %s", device, maxAttempts, err, exitErr.Stderr)
+	}
+	return fmt.Errorf("failed to unmount %q after %d tries: %v", device, maxAttempts, err)
 }
