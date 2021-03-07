@@ -74,7 +74,7 @@ func (du DiskUtil) Info(volume string) (VolumeInfo, error) {
 
 // Rename volume to name.
 func (du DiskUtil) Rename(volume VolumeInfo, name string) error {
-	cmd := du.execCommand("diskutil", "rename", volume.UUID, name)
+	cmd := du.execCommand("diskutil", "rename", volume.Device, name)
 	cmd.Stdout = os.Stdout
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
@@ -101,7 +101,7 @@ func (s Snapshot) String() string {
 // in the order of most recent snapshot first. Note that this is the reverse of
 // the order returned by 'diskutil apfs listsnapshots`.
 func (du DiskUtil) ListSnapshots(volume VolumeInfo) ([]Snapshot, error) {
-	cmd := du.execCommand("diskutil", "apfs", "listsnapshots", "-plist", volume.UUID)
+	cmd := du.execCommand("diskutil", "apfs", "listsnapshots", "-plist", volume.Device)
 	var snapshotList struct {
 		Snapshots []Snapshot `json:"Snapshots"`
 	}
@@ -159,7 +159,7 @@ func parseTimeFromSnapshotName(name string) (time.Time, error) {
 
 // DeleteSnapshot removes the given snapshot from the given volume.
 func (du DiskUtil) DeleteSnapshot(volume VolumeInfo, snap Snapshot) error {
-	cmd := du.execCommand("diskutil", "apfs", "deletesnapshot", volume.UUID, "-uuid", snap.UUID)
+	cmd := du.execCommand("diskutil", "apfs", "deletesnapshot", volume.Device, "-uuid", snap.UUID)
 	cmd.Stdout = os.Stdout
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr

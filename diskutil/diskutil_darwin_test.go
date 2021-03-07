@@ -101,9 +101,12 @@ func TestInfo_Errors(t *testing.T) {
 }
 
 func TestListSnapshots(t *testing.T) {
-	diskimage.MountRO(t, img)
+	mountpoint, device := diskimage.MountRO(t, img)
 	du := diskutil.New()
-	got, err := du.ListSnapshots(imgInfo)
+	info := imgInfo
+	info.MountPoint = mountpoint
+	info.Device = device
+	got, err := du.ListSnapshots(info)
 	if err != nil {
 		t.Fatalf("ListSnapshots returned unexpected error: %v, want: nil", err)
 	}
@@ -124,7 +127,10 @@ func TestListSnapshots_Error(t *testing.T) {
 func TestRename(t *testing.T) {
 	mountpoint, device := diskimage.MountRW(t, img)
 	du := diskutil.New()
-	if err := du.Rename(imgInfo, "newname"); err != nil {
+	info := imgInfo
+	info.MountPoint = mountpoint
+	info.Device = device
+	if err := du.Rename(info, "newname"); err != nil {
 		t.Fatalf("Rename returned unexpected error: %v, want: nil", err)
 	}
 	got, err := du.Info(device)
@@ -150,13 +156,16 @@ func TestRename_Errors(t *testing.T) {
 }
 
 func TestDeleteSnapshot(t *testing.T) {
-	diskimage.MountRW(t, img)
+	mountpoint, device := diskimage.MountRW(t, img)
 	du := diskutil.New()
-	err := du.DeleteSnapshot(imgInfo, imgSnaps[1])
+	info := imgInfo
+	info.MountPoint = mountpoint
+	info.Device = device
+	err := du.DeleteSnapshot(info, imgSnaps[1])
 	if err != nil {
 		t.Fatalf("DeleteSnapshot returned unexpected error: %v, want: nil", err)
 	}
-	got, err := du.ListSnapshots(imgInfo)
+	got, err := du.ListSnapshots(info)
 	if err != nil {
 		t.Fatalf("ListSnapshots returned unexpected error: %v, want: nil", err)
 	}
@@ -165,11 +174,11 @@ func TestDeleteSnapshot(t *testing.T) {
 		t.Errorf("DeleteSnapshot resulted in unexpected snapshots. -want +got:\n%s", diff)
 	}
 
-	err = du.DeleteSnapshot(imgInfo, imgSnaps[0])
+	err = du.DeleteSnapshot(info, imgSnaps[0])
 	if err != nil {
 		t.Fatalf("DeleteSnapshot returned unexpected error: %v, want: nil", err)
 	}
-	got, err = du.ListSnapshots(imgInfo)
+	got, err = du.ListSnapshots(info)
 	if err != nil {
 		t.Fatalf("ListSnapshots returned unexpected error: %v, want: nil", err)
 	}

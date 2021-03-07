@@ -259,12 +259,12 @@ func TestListSnapshots(t *testing.T) {
 	}
 }
 
-func TestListSnapshots_IDsVolumesByUUID(t *testing.T) {
+func TestListSnapshots_IDsVolumesByDevice(t *testing.T) {
 	du := newWithFakeCmd(t,
 		fakecmd.Stdout("plutil", `{
 			"Snapshots": []
 		}`),
-		fakecmd.WantArg("diskutil", exampleVolumeInfo.UUID),
+		fakecmd.WantArg("diskutil", exampleVolumeInfo.Device),
 	)
 	_, err := du.ListSnapshots(exampleVolumeInfo)
 	if err := fakecmd.AsHelperProcessErr(err); err != nil {
@@ -384,8 +384,8 @@ func TestRename(t *testing.T) {
 	}
 }
 
-func TestRename_IDsVolumesByUUID(t *testing.T) {
-	du := newWithFakeCmd(t, fakecmd.WantArg("diskutil", exampleVolumeInfo.UUID))
+func TestRename_IDsVolumesByDevice(t *testing.T) {
+	du := newWithFakeCmd(t, fakecmd.WantArg("diskutil", exampleVolumeInfo.Device))
 	err := du.Rename(exampleVolumeInfo, "newname")
 	if err := fakecmd.AsHelperProcessErr(err); err != nil {
 		t.Fatal(err)
@@ -425,8 +425,8 @@ func TestDeleteSnapshot(t *testing.T) {
 	}
 }
 
-func TestDeleteSnapshot_IDsVolumesByUUID(t *testing.T) {
-	du := newWithFakeCmd(t, fakecmd.WantArg("diskutil", exampleVolumeInfo.UUID))
+func TestDeleteSnapshot_IDsVolumesByDevice(t *testing.T) {
+	du := newWithFakeCmd(t, fakecmd.WantArg("diskutil", exampleVolumeInfo.Device))
 	err := du.DeleteSnapshot(exampleVolumeInfo, Snapshot{
 		Name: "example-snapshot",
 		UUID: "example-snapshot-uuid",
