@@ -32,6 +32,14 @@ func InitializeTargets(initTargets bool) Option {
 	}
 }
 
+// TODO: document.
+func DryRun(dryrun bool) Option {
+	return func(c *Cloner) {
+		withDiskUtil(diskutil.NewDryRun())(c)
+		withASR(asr.NewDryRun())(c)
+	}
+}
+
 func withDiskUtil(du du) Option {
 	return func(c *Cloner) {
 		c.diskutil = du

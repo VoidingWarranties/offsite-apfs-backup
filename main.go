@@ -20,11 +20,13 @@ Incompatible with -initialize.`)
 Set -initialize to true when first setting up an off-site backup volume.
 If false (default), nondestructively clone the latest APFS snapshot in source to targets using the latest snapshot in common.
 Incompatible with -prune.`)
+	dryrun = flag.Bool("dryrun", false, `If true, only print the changes that would have been made to targets.
+Does not modify targets in any way.`)
 )
 
 func init() {
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), `Usage: %s [-prune] [-initialize] [--] <source volume> <target volume> [<target volume>...]
+		fmt.Fprintf(flag.CommandLine.Output(), `Usage: %s [-prune] [-initialize] [-dryrun] [--] <source volume> <target volume> [<target volume>...]
 
   <source volume>
     	Source APFS volume to clone.
@@ -57,7 +59,11 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-	c := cloner.New(cloner.Prune(*prune), cloner.InitializeTargets(*initialize))
+	c := cloner.New(
+		cloner.Prune(*prune),
+		cloner.InitializeTargets(*initialize),
+		cloner.DryRun(*dryrun),
+	)
 	if err := c.Cloneable(source, targets...); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
