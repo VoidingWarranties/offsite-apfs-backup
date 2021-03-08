@@ -7,9 +7,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/voidingwarranties/offsite-apfs-backup/testutils/fakecmd"
-
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/voidingwarranties/offsite-apfs-backup/testutils/fakecmd"
 )
 
 func TestHelperProcess(t *testing.T) {

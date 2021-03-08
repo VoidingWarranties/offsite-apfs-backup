@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/voidingwarranties/offsite-apfs-backup/plutil"
-	"github.com/voidingwarranties/offsite-apfs-backup/testutils/fakecmd"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
+	"github.com/voidingwarranties/offsite-apfs-backup/plutil"
+	"github.com/voidingwarranties/offsite-apfs-backup/testutils/fakecmd"
 )
 
 func TestHelperProcess(t *testing.T) {

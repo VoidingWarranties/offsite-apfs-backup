@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/voidingwarranties/offsite-apfs-backup/asr"
 	"github.com/voidingwarranties/offsite-apfs-backup/diskutil"
 	"github.com/voidingwarranties/offsite-apfs-backup/testutils/diskimage"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 var mounter = diskimage.Mounter{
