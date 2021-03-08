@@ -13,19 +13,19 @@ import (
 // Option configures Cloner.
 type Option func(*Cloner)
 
-// Prune, if true, returns an Option that deletes the snapshot that source and
-// target had in common iff a clone is completed successfully.
+// Prune returns an Option that, if prune is true, deletes the snapshot that
+// source and target had in common iff a clone is completed successfully.
 func Prune(prune bool) Option {
 	return func(c *Cloner) {
 		c.prune = prune
 	}
 }
 
-// InitializeTargets, if true, returns an Option that changes the behavior of
-// Clone to do a destructive clone of source's latest snapshot to target,
-// rather than a nondestructive incremental clone. To avoid accidentally
-// deleting data, target must not have any snapshots, otherwise Cloneable and
-// Clone returne errors.
+// InitializeTargets returns an Option that, if initTargets is true, changes
+// the behavior of Clone to do a destructive clone of source's latest snapshot
+// to target, rather than a nondestructive incremental clone. To avoid
+// accidentally deleting data, target must not have any snapshots, otherwise
+// Cloneable and Clone returne errors.
 func InitializeTargets(initTargets bool) Option {
 	return func(c *Cloner) {
 		c.initTargets = initTargets
