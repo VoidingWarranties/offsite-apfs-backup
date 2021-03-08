@@ -194,7 +194,9 @@ func (asr *fakeASR) Restore(source, target diskutil.VolumeInfo, to, from diskuti
 		return err
 	}
 	// Add `to` snapshot to target.
-	asr.devices.AddSnapshot(target.UUID, to)
+	if err := asr.devices.AddSnapshot(target.UUID, to); err != nil {
+		return err
+	}
 	// Rename target to source name.
 	snaps, err := asr.devices.Snapshots(target.UUID)
 	if err != nil {
