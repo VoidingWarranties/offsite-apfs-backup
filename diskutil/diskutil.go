@@ -12,7 +12,7 @@ import (
 	"sort"
 	"time"
 
-	"apfs-snapshot-diff-clone/plutil"
+	"github.com/voidingwarranties/offsite-apfs-backup/plutil"
 )
 
 // DiskUtil reads and modifies metadata of local volumes.

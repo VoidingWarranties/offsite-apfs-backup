@@ -1,4 +1,4 @@
-module apfs-snapshot-diff-clone
+module github.com/voidingwarranties/offsite-apfs-backup
 
 go 1.16
 

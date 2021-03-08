@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"apfs-snapshot-diff-clone/cloner"
+	"github.com/voidingwarranties/offsite-apfs-backup/cloner"
 )
 
 var (

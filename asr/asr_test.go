@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"apfs-snapshot-diff-clone/diskutil"
-	"apfs-snapshot-diff-clone/testutils/fakecmd"
+	"github.com/voidingwarranties/offsite-apfs-backup/diskutil"
+	"github.com/voidingwarranties/offsite-apfs-backup/testutils/fakecmd"
 )
 
 func TestHelperProcess(t *testing.T) {

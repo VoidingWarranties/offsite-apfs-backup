@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"apfs-snapshot-diff-clone/asr"
-	"apfs-snapshot-diff-clone/diskutil"
-	"apfs-snapshot-diff-clone/testutils/diskimage"
+	"github.com/voidingwarranties/offsite-apfs-backup/asr"
+	"github.com/voidingwarranties/offsite-apfs-backup/diskutil"
+	"github.com/voidingwarranties/offsite-apfs-backup/testutils/diskimage"
 
 	"github.com/google/go-cmp/cmp"
 )

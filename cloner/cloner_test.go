@@ -7,7 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"apfs-snapshot-diff-clone/diskutil"
+	"github.com/voidingwarranties/offsite-apfs-backup/diskutil"
 )
 
 func TestCloneable(t *testing.T) {

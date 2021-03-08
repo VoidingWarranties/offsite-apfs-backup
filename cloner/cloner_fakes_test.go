@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"apfs-snapshot-diff-clone/diskutil"
+	"github.com/voidingwarranties/offsite-apfs-backup/diskutil"
 )
 
 type fakeDevices struct {

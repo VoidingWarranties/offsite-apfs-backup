@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"apfs-snapshot-diff-clone/plutil"
-	"apfs-snapshot-diff-clone/testutils/fakecmd"
+	"github.com/voidingwarranties/offsite-apfs-backup/plutil"
+	"github.com/voidingwarranties/offsite-apfs-backup/testutils/fakecmd"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"

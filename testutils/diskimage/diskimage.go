@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"apfs-snapshot-diff-clone/diskutil"
-	"apfs-snapshot-diff-clone/plutil"
+	"github.com/voidingwarranties/offsite-apfs-backup/diskutil"
+	"github.com/voidingwarranties/offsite-apfs-backup/plutil"
 )
 
 // Testdata disk images:

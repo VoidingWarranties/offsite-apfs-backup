@@ -10,7 +10,7 @@ import (
 	"os"
 	"os/exec"
 
-	"apfs-snapshot-diff-clone/diskutil"
+	"github.com/voidingwarranties/offsite-apfs-backup/diskutil"
 )
 
 // ASR restores a target volume to a source volume's APFS snapshot.

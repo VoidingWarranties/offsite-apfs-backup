@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"apfs-snapshot-diff-clone/testutils/fakecmd"
+	"github.com/voidingwarranties/offsite-apfs-backup/testutils/fakecmd"
 
 	"github.com/google/go-cmp/cmp"
 )

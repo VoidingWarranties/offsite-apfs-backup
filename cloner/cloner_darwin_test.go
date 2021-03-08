@@ -5,9 +5,9 @@ package cloner_test
 import (
 	"testing"
 
-	"apfs-snapshot-diff-clone/cloner"
-	"apfs-snapshot-diff-clone/diskutil"
-	"apfs-snapshot-diff-clone/testutils/diskimage"
+	"github.com/voidingwarranties/offsite-apfs-backup/cloner"
+	"github.com/voidingwarranties/offsite-apfs-backup/diskutil"
+	"github.com/voidingwarranties/offsite-apfs-backup/testutils/diskimage"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"

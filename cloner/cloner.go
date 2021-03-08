@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log"
 
-	"apfs-snapshot-diff-clone/asr"
-	"apfs-snapshot-diff-clone/diskutil"
+	"github.com/voidingwarranties/offsite-apfs-backup/asr"
+	"github.com/voidingwarranties/offsite-apfs-backup/diskutil"
 )
 
 // Option configures Cloner.
