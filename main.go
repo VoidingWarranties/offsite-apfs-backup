@@ -67,12 +67,9 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-
-	if *initialize {
-		if err := confirmInitialize(source, targets); err != nil {
-			fmt.Fprintln(flag.CommandLine.Output(), "Error:", err)
-			os.Exit(1)
-		}
+	if err := confirm(source, targets); err != nil {
+		fmt.Fprintln(flag.CommandLine.Output(), "Error:", err)
+		os.Exit(1)
 	}
 
 	errs := make(map[string]error) // Map of target volume to clone error.
@@ -115,8 +112,12 @@ func validateFlags(targets []string) error {
 	return nil
 }
 
-func confirmInitialize(source string, targets []string) error {
-	fmt.Printf("This will delete all data on the following volumes before restoring them to %s's most recent snapshot.\n", source)
+func confirm(source string, targets []string) error {
+	if *initialize {
+		fmt.Printf("This will delete all data on the following volumes before restoring them to %s's most recent snapshot.\n", source)
+	} else {
+		fmt.Println("This will keep existing snapshots but delete any data written to the following volume's after their most recent snapshot.")
+	}
 	for _, t := range targets {
 		fmt.Printf("  - %s\n", t)
 	}
