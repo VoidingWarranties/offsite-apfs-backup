@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 
@@ -41,7 +40,7 @@ func (a ASR) Restore(source, target diskutil.VolumeInfo, to, from diskutil.Snaps
 	cmd.Stdout = a.osStdout
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
-	log.Printf("Running command:\n%s", cmd)
+	fmt.Fprintf(a.osStdout, "Running command:\n%s\n", cmd)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("`%s` failed (%w) with stderr: %s", cmd, err, stderr.String())
 	}
@@ -61,7 +60,7 @@ func (a ASR) DestructiveRestore(source, target diskutil.VolumeInfo, to diskutil.
 	cmd.Stdout = a.osStdout
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
-	log.Printf("Running command:\n%s", cmd)
+	fmt.Fprintf(a.osStdout, "Running command:\n%s\n", cmd)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("`%s` failed (%w) with stderr: %s", cmd, err, stderr.String())
 	}

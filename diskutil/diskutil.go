@@ -5,7 +5,6 @@ package diskutil
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"regexp"
@@ -78,8 +77,6 @@ func (du DiskUtil) Rename(volume VolumeInfo, name string) error {
 	cmd.Stdout = os.Stdout
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
-
-	log.Printf("Running command:\n%s", cmd)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("`%s` failed (%w) with stderr: %s", cmd, err, stderr)
 	}
@@ -163,8 +160,6 @@ func (du DiskUtil) DeleteSnapshot(volume VolumeInfo, snap Snapshot) error {
 	cmd.Stdout = os.Stdout
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
-
-	log.Printf("Running command:\n%s", cmd)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("`%s` failed (%w) with stderr: %s", cmd, err, stderr)
 	}
@@ -172,7 +167,6 @@ func (du DiskUtil) DeleteSnapshot(volume VolumeInfo, snap Snapshot) error {
 }
 
 func (du DiskUtil) runAndDecodePlist(cmd *exec.Cmd, v interface{}) error {
-	log.Printf("Running command:\n%s", cmd)
 	stdout, err := cmd.Output()
 	if err != nil {
 		var errMsg plistErrorMessage

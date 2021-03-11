@@ -4,7 +4,6 @@ package cloner
 import (
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/voidingwarranties/offsite-apfs-backup/asr"
 	"github.com/voidingwarranties/offsite-apfs-backup/diskutil"
@@ -167,7 +166,7 @@ func (c Cloner) cloneable(sourceSnaps, targetSnaps []diskutil.Snapshot) error {
 // Clone the latest snapshot in source to target, from the most recent common
 // snapshot present in both source and target.
 func (c Cloner) Clone(source, target string) error {
-	log.Printf("Cloning %q to %q...", source, target)
+	fmt.Printf("Cloning %q to %q...\n", source, target)
 
 	sourceInfo, err := c.diskutil.Info(source)
 	if err != nil {
@@ -208,17 +207,17 @@ func (c Cloner) clone(source, target diskutil.VolumeInfo) error {
 	if err != nil {
 		return fmt.Errorf("error finding latest snapshot in common between source and target: %v", err)
 	}
-	log.Printf("Found snapshot in common: %s", commonSnap)
+	fmt.Printf("Found snapshot in common: %s\n", commonSnap)
 
 	// TODO: document that this relies on the snapshots being in the right order.
 	latestSourceSnap := sourceSnaps[0]
-	log.Printf("Restoring to latest snapshot in source, %s, from common snapshot", latestSourceSnap)
+	fmt.Printf("Restoring to latest snapshot in source, %s, from common snapshot\n", latestSourceSnap)
 	if err := c.asr.Restore(source, target, latestSourceSnap, commonSnap); err != nil {
 		return fmt.Errorf("error restoring: %v", err)
 	}
 
 	if c.prune {
-		log.Print("Pruning common snapshot from target...")
+		fmt.Println("Pruning common snapshot from target...")
 		if err := c.diskutil.DeleteSnapshot(target, commonSnap); err != nil {
 			return fmt.Errorf("error deleting snapshot %q from target", commonSnap)
 		}
@@ -243,7 +242,7 @@ func (c Cloner) destructiveClone(source, target diskutil.VolumeInfo) error {
 	}
 	// TODO: document that this relies on the snapshots being in the right order.
 	latestSourceSnap := sourceSnaps[0]
-	log.Printf("Restoring to latest snapshot in source, %s", latestSourceSnap)
+	fmt.Printf("Restoring to latest snapshot in source, %s\n", latestSourceSnap)
 	if err := c.asr.DestructiveRestore(source, target, latestSourceSnap); err != nil {
 		return fmt.Errorf("error restoring: %v", err)
 	}

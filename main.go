@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
@@ -82,11 +81,12 @@ func main() {
 	for _, target := range targets {
 		if err := c.Clone(source, target); err != nil {
 			errs[target] = err
-			log.Printf("failed to clone %q to %q: %v", source, target, err)
+			fmt.Fprintf(os.Stderr, "failed to clone %q to %q: %v\n", source, target, err)
 		}
 	}
 	if len(errs) > 0 {
-		log.Fatalf("failed to clone to %d/%d targets", len(errs), len(targets))
+		fmt.Fprintf(os.Stderr, "failed to clone to %d/%d targets\n", len(errs), len(targets))
+		os.Exit(1)
 	}
 }
 
