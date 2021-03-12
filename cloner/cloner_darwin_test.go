@@ -8,6 +8,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"github.com/voidingwarranties/offsite-apfs-backup/asr"
 	"github.com/voidingwarranties/offsite-apfs-backup/cloner"
 	"github.com/voidingwarranties/offsite-apfs-backup/diskutil"
 	"github.com/voidingwarranties/offsite-apfs-backup/testutils/diskimage"
@@ -48,7 +49,10 @@ func TestCloneable(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			test.setup(t)
-			c := cloner.New(test.opts...)
+			du := diskutil.New()
+			// nil so that test panics of any asr methods are called.
+			var r asr.ASR = nil
+			c := cloner.New(du, r, test.opts...)
 			if err := c.Cloneable(test.source, test.targets...); err != nil {
 				t.Errorf("Cloneable returned error: %q, want: nil", err)
 			}
@@ -142,12 +146,48 @@ func TestCloneable_Errors(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			test.setup(t)
-			c := cloner.New(test.opts...)
+			du := diskutil.New()
+			// nil so that test panics of any asr methods are called.
+			var r asr.ASR = nil
+			c := cloner.New(du, r, test.opts...)
 			if err := c.Cloneable(test.source, test.targets...); err == nil {
 				t.Error("Cloneable returned error: nil, want: non-nil")
 			}
 		})
 	}
+}
+
+func TestClone_DryRun(t *testing.T) {
+	sourceInfo := mounter.MountRO(t, diskimage.SourceImg)
+	targetInfo := mounter.MountRW(t, diskimage.TargetImg)
+
+	wantTargetSnaps := diskimage.TargetImg.Snapshots(t)
+
+	du := diskutil.NewDryRun(diskutil.New())
+	r := asr.NewDryRun()
+	c := cloner.New(du, r)
+	if err := c.Clone(sourceInfo.Device, targetInfo.Device); err != nil {
+		t.Fatalf("Clone returned unexpected error: %q, want: nil", err)
+	}
+
+	t.Run("target's volume not modified", func(t *testing.T) {
+		gotInfo, err := du.Info(targetInfo.Device)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(targetInfo, gotInfo); diff != "" {
+			t.Errorf("Clone resulted in unexpected target info. -want +got:\n%s", diff)
+		}
+	})
+	t.Run("target's snapshots not modified", func(t *testing.T) {
+		gotSnaps, err := du.ListSnapshots(targetInfo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(wantTargetSnaps, gotSnaps); diff != "" {
+			t.Errorf("Clone resulted in unexpected target snapshots. -want +got:\n%s", diff)
+		}
+	})
 }
 
 func TestClone_Incremental(t *testing.T) {
@@ -186,7 +226,7 @@ func TestClone_Incremental(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			c := cloner.New(test.opts...)
+			c := cloner.New(diskutil.New(), asr.New(), test.opts...)
 			if err := c.Clone(source, target); err != nil {
 				t.Fatalf("Clone returned unexpected error: %v, want: nil", err)
 			}
@@ -227,7 +267,7 @@ func TestClone_InitializeTargets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := cloner.New(cloner.InitializeTargets(true))
+	c := cloner.New(diskutil.New(), asr.New(), cloner.InitializeTargets(true))
 	if err := c.Clone(source, target); err != nil {
 		t.Fatalf("Clone returned unexpected error: %v, want: nil", err)
 	}
@@ -298,7 +338,10 @@ func TestClone_Errors(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			source, target := test.setup(t)
-			c := cloner.New(test.opts...)
+			du := diskutil.New()
+			// nil so that test panics of any asr methods are called.
+			var r asr.ASR = nil
+			c := cloner.New(du, r, test.opts...)
 			if err := c.Clone(source, target); err == nil {
 				t.Fatal("Clone returned unexpected error: nil, want: non-nil")
 			}

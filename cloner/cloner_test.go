@@ -7,6 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"github.com/voidingwarranties/offsite-apfs-backup/asr"
 	"github.com/voidingwarranties/offsite-apfs-backup/diskutil"
 )
 
@@ -127,11 +128,14 @@ func TestCloneable(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			du := &fakeDiskUtil{test.fakeDevices}
-			opts := append([]Option{
-				withDiskUtil(&readonlyFakeDiskUtil{du: du}),
-			}, test.opts...)
-			c := New(opts...)
+			// readonly so that test panics if any modifying methods are called.
+			du := &readonlyFakeDiskUtil{
+				du: &fakeDiskUtil{test.fakeDevices},
+			}
+			// nil so that test panics if asr is called.
+			var r asr.ASR = nil
+
+			c := New(du, r, test.opts...)
 			if err := c.Cloneable(test.source, test.targets...); err != nil {
 				t.Errorf("Cloneable returned error: %q, want: nil", err)
 			}
@@ -343,11 +347,14 @@ func TestCloneable_Errors(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			du := &fakeDiskUtil{test.fakeDevices}
-			opts := append([]Option{
-				withDiskUtil(&readonlyFakeDiskUtil{du: du}),
-			}, test.opts...)
-			c := New(opts...)
+			// readonly so that test panics if any modifying methods are called.
+			du := &readonlyFakeDiskUtil{
+				du: &fakeDiskUtil{test.fakeDevices},
+			}
+			// nil so that test panics if asr is called.
+			var r asr.ASR = nil
+
+			c := New(du, r, test.opts...)
 			if err := c.Cloneable(test.source, test.targets...); err == nil {
 				t.Error("Cloneable returnd error: nil, want: non-nil")
 			}
@@ -476,11 +483,8 @@ func TestClone(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			du := &fakeDiskUtil{test.fakeDevices}
-			opts := append([]Option{
-				withDiskUtil(du),
-				withASR(&fakeASR{test.fakeDevices}),
-			}, test.opts...)
-			c := New(opts...)
+			r := &fakeASR{test.fakeDevices}
+			c := New(du, r, test.opts...)
 			if err := c.Clone(test.source, test.target); err != nil {
 				t.Fatalf("Clone(...) returned unexpected error: %q, want: nil", err)
 			}
@@ -505,6 +509,136 @@ func TestClone(t *testing.T) {
 				cmpopts.SortSlices(func(lhs, rhs diskutil.Snapshot) bool {
 					return lhs.UUID < rhs.UUID
 				}),
+			}
+			if diff := cmp.Diff(test.wantSourceSnaps, gotSourceSnaps, cmpOpts...); diff != "" {
+				t.Errorf("Clone(...) resulted in unexpected snapshots in source. -want +got:\n%s", diff)
+			}
+			if diff := cmp.Diff(test.wantTargetSnaps, gotTargetSnaps, cmpOpts...); diff != "" {
+				t.Errorf("Clone(...) resulted in unexpected snapshots in target. -want +got:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestClone_DryRun(t *testing.T) {
+	snap1 := diskutil.Snapshot{
+		Name:    "common-snap",
+		UUID:    "123-common-uuid",
+		Created: time.Time{},
+	}
+	snap2 := diskutil.Snapshot{
+		Name:    "latest-snap",
+		UUID:    "123-latest-uuid",
+		Created: snap1.Created.Add(time.Hour),
+	}
+
+	tests := []struct {
+		name        string
+		fakeDevices *fakeDevices
+		opts        []Option
+		source      string
+		target      string
+
+		wantSourceSnaps []diskutil.Snapshot
+		wantTargetSnaps []diskutil.Snapshot
+	}{
+		{
+			name: "incremental prune dryrun",
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(
+					diskutil.VolumeInfo{
+						Name:       "foo-name",
+						UUID:       "123-foo-uuid",
+						MountPoint: "/foo/mount/point",
+					},
+					snap2,
+					snap1,
+				),
+				withFakeVolume(
+					diskutil.VolumeInfo{
+						Name:       "bar-name",
+						UUID:       "123-bar-uuid",
+						MountPoint: "/bar/mount/point",
+					},
+					snap1,
+				),
+			),
+			opts:   []Option{Prune(true)},
+			source: "/foo/mount/point",
+			target: "/bar/mount/point",
+			wantSourceSnaps: []diskutil.Snapshot{
+				snap2,
+				snap1,
+			},
+			wantTargetSnaps: []diskutil.Snapshot{
+				snap1,
+			},
+		},
+		{
+			name: "initialize dryrun",
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(
+					diskutil.VolumeInfo{
+						Name:       "foo-name",
+						UUID:       "123-foo-uuid",
+						MountPoint: "/foo/mount/point",
+					},
+					snap2,
+					snap1,
+				),
+				withFakeVolume(
+					diskutil.VolumeInfo{
+						Name:       "bar-name",
+						UUID:       "123-bar-uuid",
+						MountPoint: "/bar/mount/point",
+					},
+				),
+			),
+			opts:   []Option{InitializeTargets(true)},
+			source: "/foo/mount/point",
+			target: "/bar/mount/point",
+			wantSourceSnaps: []diskutil.Snapshot{
+				snap2,
+				snap1,
+			},
+			wantTargetSnaps: nil,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Use a readonly fake diskutil underlying the dryrun
+			// diskutil so that the test panics if any modifying
+			// methods of the underlying diskutil are called.
+			du := diskutil.NewDryRun(&readonlyFakeDiskUtil{
+				du: &fakeDiskUtil{test.fakeDevices},
+			})
+			r := asr.NewDryRun()
+			c := New(du, r, test.opts...)
+			if err := c.Clone(test.source, test.target); err != nil {
+				t.Fatalf("Clone(...) returned unexpected error: %q, want: nil", err)
+			}
+
+			sourceInfo, err := du.Info(test.source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			targetInfo, err := du.Info(test.target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			gotSourceSnaps, err := du.ListSnapshots(sourceInfo)
+			if err != nil {
+				t.Fatalf("error listing snapshots: %v", err)
+			}
+			gotTargetSnaps, err := du.ListSnapshots(targetInfo)
+			if err != nil {
+				t.Fatalf("error listing snapshots: %v", err)
+			}
+			cmpOpts := []cmp.Option{
+				cmpopts.SortSlices(func(lhs, rhs diskutil.Snapshot) bool {
+					return lhs.UUID < rhs.UUID
+				}),
+				cmpopts.EquateEmpty(),
 			}
 			if diff := cmp.Diff(test.wantSourceSnaps, gotSourceSnaps, cmpOpts...); diff != "" {
 				t.Errorf("Clone(...) resulted in unexpected snapshots in source. -want +got:\n%s", diff)
@@ -637,6 +771,28 @@ func TestClone_Errors(t *testing.T) {
 			target: "/bar/mount/point",
 		},
 		{
+			name: "incremental clone - no source snaps",
+			fakeDevices: newFakeDevices(t,
+				withFakeVolume(
+					diskutil.VolumeInfo{
+						Name:       "foo-name",
+						UUID:       "123-foo-uuid",
+						MountPoint: "/foo/mount/point",
+					},
+				),
+				withFakeVolume(
+					diskutil.VolumeInfo{
+						Name:       "bar-name",
+						UUID:       "123-bar-uuid",
+						MountPoint: "/bar/mount/point",
+					},
+					snap1,
+				),
+			),
+			source: "/foo/mount/point",
+			target: "/bar/mount/point",
+		},
+		{
 			name: "initialize - no source snaps",
 			fakeDevices: newFakeDevices(t,
 				withFakeVolume(
@@ -686,15 +842,14 @@ func TestClone_Errors(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			opts := append([]Option{
-				// readonly so that test panics if any modifying methods are called.
-				withDiskUtil(&readonlyFakeDiskUtil{
-					du: &fakeDiskUtil{test.fakeDevices},
-				}),
-				// nil so that test panics if asr is called.
-				withASR(nil),
-			}, test.opts...)
-			c := New(opts...)
+			// readonly so that test panics if any modifying methods are called.
+			du := &readonlyFakeDiskUtil{
+				du: &fakeDiskUtil{test.fakeDevices},
+			}
+			// nil so that test panics if asr is called.
+			var r asr.ASR = nil
+
+			c := New(du, r, test.opts...)
 			if err := c.Clone(test.source, test.target); err == nil {
 				t.Fatal("Clone(...) returned unexpected error: nil, want: non-nil")
 			}

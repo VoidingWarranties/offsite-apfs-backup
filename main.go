@@ -2,13 +2,17 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
+	"github.com/voidingwarranties/offsite-apfs-backup/asr"
 	"github.com/voidingwarranties/offsite-apfs-backup/cloner"
+	"github.com/voidingwarranties/offsite-apfs-backup/diskutil"
 )
 
 var (
@@ -58,18 +62,29 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-	c := cloner.New(
-		cloner.Prune(*prune),
-		cloner.InitializeTargets(*initialize),
-		cloner.DryRun(*dryrun),
-	)
-	if err := c.Cloneable(source, targets...); err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		os.Exit(1)
-	}
 	if err := validateFlags(targets); err != nil {
 		fmt.Fprintln(flag.CommandLine.Output(), "Error:", err)
 		flag.Usage()
+		os.Exit(1)
+	}
+
+	// Indent the stdout of cloner, diskutil, and asr with a single tab, to
+	// help separate different clones to different targets.
+	stdout := newPrefixWriter([]byte("\t"), os.Stdout)
+	du := diskutil.New()
+	var r asr.ASR = asr.New(asr.Stdout(stdout))
+	if *dryrun {
+		du = diskutil.NewDryRun(du)
+		r = asr.NewDryRun(asr.Stdout(stdout))
+	}
+	c := cloner.New(
+		du, r,
+		cloner.Prune(*prune),
+		cloner.InitializeTargets(*initialize),
+		cloner.Stdout(stdout),
+	)
+	if err := c.Cloneable(source, targets...); err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
 	}
 	if err := confirm(source, targets); err != nil {
@@ -79,6 +94,7 @@ func main() {
 
 	errs := make(map[string]error) // Map of target volume to clone error.
 	for _, target := range targets {
+		fmt.Printf("Cloning %q to %q...\n", source, target)
 		if err := c.Clone(source, target); err != nil {
 			errs[target] = err
 			fmt.Fprintf(os.Stderr, "failed to clone %q to %q: %v\n", source, target, err)
@@ -140,4 +156,55 @@ func confirm(source string, targets []string) error {
 		return nil
 	}
 	return errors.New("-initialize confirmation rejected")
+}
+
+type prefixWriter struct {
+	output          io.Writer
+	prefix          []byte
+	prefixNextWrite bool
+}
+
+func newPrefixWriter(prefix []byte, w io.Writer) *prefixWriter {
+	return &prefixWriter{
+		output: w,
+		prefix: prefix,
+		// If true, write prefix before writing any other data to
+		// output on the next call to Write.
+		prefixNextWrite: true,
+	}
+}
+
+func (w *prefixWriter) Write(p []byte) (n int, err error) {
+	lines := bytes.SplitAfter(p, []byte("\n"))
+	if len(lines[len(lines)-1]) == 0 {
+		// If p ends in a newline, remove the last element so we don't write a tab
+		// after the last newline.
+		lines = lines[:len(lines)-1]
+	}
+	for i, line := range lines {
+		if w.prefixNextWrite || i != 0 {
+			if _, err := w.output.Write(w.prefix); err != nil {
+				// Count the number of bytes of p we've successfully written so far
+				// (excluding the current line, which we have yet to write).
+				n := 0
+				for ii := 0; ii < i; ii++ {
+					n += len(lines[ii])
+				}
+				return n, err
+			}
+		}
+		if n, err := w.output.Write(line); err != nil {
+			// Count the number of bytes of p we've successfully written so far,
+			// including the number of bytes of the current line that were successfully
+			// written.
+			for ii := 0; ii < i; ii++ {
+				n += len(lines[ii])
+			}
+			return n, err
+		}
+	}
+	// Only prefix the next call to Write with prefix if p ends in a
+	// newline.
+	w.prefixNextWrite = p[len(p)-1] == '\n'
+	return len(p), nil
 }

@@ -1,27 +1,30 @@
 package diskutil
 
-type DryRunDiskUtil struct {
+type dryRun struct {
 	du DiskUtil
 }
 
-func NewDryRun(opts ...option) DryRunDiskUtil {
-	return DryRunDiskUtil{
-		du: New(opts...),
+// NewDryRun returns a DiskUtil that cannot modify any volumes. All
+// readonly methods (Info and ListSnapshots) are passed through to the
+// underlying DiskUtil, du.
+func NewDryRun(du DiskUtil) DiskUtil {
+	return dryRun{
+		du: du,
 	}
 }
 
-func (dry DryRunDiskUtil) Info(volume string) (VolumeInfo, error) {
+func (dry dryRun) Info(volume string) (VolumeInfo, error) {
 	return dry.du.Info(volume)
 }
 
-func (dry DryRunDiskUtil) Rename(volume VolumeInfo, name string) error {
+func (dry dryRun) Rename(volume VolumeInfo, name string) error {
 	return nil
 }
 
-func (dry DryRunDiskUtil) ListSnapshots(volume VolumeInfo) ([]Snapshot, error) {
+func (dry dryRun) ListSnapshots(volume VolumeInfo) ([]Snapshot, error) {
 	return dry.du.ListSnapshots(volume)
 }
 
-func (dry DryRunDiskUtil) DeleteSnapshot(volume VolumeInfo, snap Snapshot) error {
+func (dry dryRun) DeleteSnapshot(volume VolumeInfo, snap Snapshot) error {
 	return nil
 }

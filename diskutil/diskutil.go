@@ -5,7 +5,6 @@ package diskutil
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"os/exec"
 	"regexp"
 	"sort"
@@ -15,28 +14,35 @@ import (
 )
 
 // DiskUtil reads and modifies metadata of local volumes.
-type DiskUtil struct {
+type DiskUtil interface {
+	Info(volume string) (VolumeInfo, error)
+	Rename(volume VolumeInfo, name string) error
+	ListSnapshots(volume VolumeInfo) ([]Snapshot, error)
+	DeleteSnapshot(volume VolumeInfo, snap Snapshot) error
+}
+
+type diskUtil struct {
 	execCommand func(string, ...string) *exec.Cmd
 	pl          plutil.PLUtil
 }
 
-type option func(*DiskUtil)
+type option func(*diskUtil)
 
 func withExecCommand(f func(string, ...string) *exec.Cmd) option {
-	return func(du *DiskUtil) {
+	return func(du *diskUtil) {
 		du.execCommand = f
 	}
 }
 
 func withPLUtil(pl plutil.PLUtil) option {
-	return func(du *DiskUtil) {
+	return func(du *diskUtil) {
 		du.pl = pl
 	}
 }
 
 // New returns a new DiskUtil.
 func New(opts ...option) DiskUtil {
-	du := DiskUtil{
+	du := diskUtil{
 		execCommand: exec.Command,
 		pl:          plutil.New(),
 	}
@@ -64,7 +70,7 @@ type VolumeInfo struct {
 
 // Info returns the VolumeInfo of volume. Volume may be a volume name, UUID,
 // mount point, or device node.
-func (du DiskUtil) Info(volume string) (VolumeInfo, error) {
+func (du diskUtil) Info(volume string) (VolumeInfo, error) {
 	cmd := du.execCommand("diskutil", "info", "-plist", volume)
 	var info VolumeInfo
 	err := du.runAndDecodePlist(cmd, &info)
@@ -72,9 +78,8 @@ func (du DiskUtil) Info(volume string) (VolumeInfo, error) {
 }
 
 // Rename volume to name.
-func (du DiskUtil) Rename(volume VolumeInfo, name string) error {
+func (du diskUtil) Rename(volume VolumeInfo, name string) error {
 	cmd := du.execCommand("diskutil", "rename", volume.Device, name)
-	cmd.Stdout = os.Stdout
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
@@ -97,7 +102,7 @@ func (s Snapshot) String() string {
 // ListSnapshots returns a volume's APFS snapshots. The snapshots are returned
 // in the order of most recent snapshot first. Note that this is the reverse of
 // the order returned by 'diskutil apfs listsnapshots`.
-func (du DiskUtil) ListSnapshots(volume VolumeInfo) ([]Snapshot, error) {
+func (du diskUtil) ListSnapshots(volume VolumeInfo) ([]Snapshot, error) {
 	cmd := du.execCommand("diskutil", "apfs", "listsnapshots", "-plist", volume.Device)
 	var snapshotList struct {
 		Snapshots []Snapshot `json:"Snapshots"`
@@ -155,9 +160,8 @@ func parseTimeFromSnapshotName(name string) (time.Time, error) {
 }
 
 // DeleteSnapshot removes the given snapshot from the given volume.
-func (du DiskUtil) DeleteSnapshot(volume VolumeInfo, snap Snapshot) error {
+func (du diskUtil) DeleteSnapshot(volume VolumeInfo, snap Snapshot) error {
 	cmd := du.execCommand("diskutil", "apfs", "deletesnapshot", volume.Device, "-uuid", snap.UUID)
-	cmd.Stdout = os.Stdout
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
@@ -166,7 +170,7 @@ func (du DiskUtil) DeleteSnapshot(volume VolumeInfo, snap Snapshot) error {
 	return nil
 }
 
-func (du DiskUtil) runAndDecodePlist(cmd *exec.Cmd, v interface{}) error {
+func (du diskUtil) runAndDecodePlist(cmd *exec.Cmd, v interface{}) error {
 	stdout, err := cmd.Output()
 	if err != nil {
 		var errMsg plistErrorMessage
