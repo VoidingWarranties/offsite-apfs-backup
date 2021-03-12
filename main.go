@@ -87,9 +87,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
 	}
-	if err := confirm(source, targets); err != nil {
-		fmt.Fprintln(flag.CommandLine.Output(), "Error:", err)
-		os.Exit(1)
+	if !*dryrun {
+		if err := confirm(source, targets); err != nil {
+			fmt.Fprintln(flag.CommandLine.Output(), "Error:", err)
+			os.Exit(1)
+		}
 	}
 
 	errs := make(map[string]error) // Map of target volume to clone error.
