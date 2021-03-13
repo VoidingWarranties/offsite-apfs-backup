@@ -147,17 +147,10 @@ func (du *fakeDiskUtil) DeleteSnapshot(volume diskutil.VolumeInfo, snap diskutil
 	return du.devices.DeleteSnapshot(volume.UUID, snap.UUID)
 }
 
-type DiskUtil interface {
-	Info(volume string) (diskutil.VolumeInfo, error)
-	Rename(volume diskutil.VolumeInfo, name string) error
-	ListSnapshots(volume diskutil.VolumeInfo) ([]diskutil.Snapshot, error)
-	DeleteSnapshot(volume diskutil.VolumeInfo, snap diskutil.Snapshot) error
-}
-
 type readonlyFakeDiskUtil struct {
 	du *fakeDiskUtil
 
-	DiskUtil
+	diskutil.DiskUtil
 }
 
 func (du *readonlyFakeDiskUtil) Info(volume string) (diskutil.VolumeInfo, error) {

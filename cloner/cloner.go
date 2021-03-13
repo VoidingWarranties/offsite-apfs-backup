@@ -4,7 +4,8 @@ package cloner
 import (
 	"errors"
 	"fmt"
-	"log"
+	"io"
+	"os"
 
 	"github.com/voidingwarranties/offsite-apfs-backup/asr"
 	"github.com/voidingwarranties/offsite-apfs-backup/diskutil"
@@ -32,23 +33,20 @@ func InitializeTargets(initTargets bool) Option {
 	}
 }
 
-func withDiskUtil(du du) Option {
+// Stdout returns an Option that sets the stdout to the given io.Writer.
+func Stdout(w io.Writer) Option {
 	return func(c *Cloner) {
-		c.diskutil = du
-	}
-}
-
-func withASR(r restorer) Option {
-	return func(c *Cloner) {
-		c.asr = r
+		c.stdout = w
 	}
 }
 
 // New returns a new Cloner with the given options.
-func New(opts ...Option) Cloner {
+func New(du diskutil.DiskUtil, r asr.ASR, opts ...Option) Cloner {
 	c := Cloner{
-		diskutil: diskutil.New(),
-		asr:      asr.New(),
+		diskutil: du,
+		asr:      r,
+
+		stdout: os.Stdout,
 
 		prune:       false,
 		initTargets: false,
@@ -61,23 +59,13 @@ func New(opts ...Option) Cloner {
 
 // Cloner clones APFS volumes using APFS snapshot diffs.
 type Cloner struct {
-	diskutil du
-	asr      restorer
+	diskutil diskutil.DiskUtil
+	asr      asr.ASR
+
+	stdout io.Writer
 
 	prune       bool
 	initTargets bool
-}
-
-type du interface {
-	Info(volume string) (diskutil.VolumeInfo, error)
-	Rename(volume diskutil.VolumeInfo, name string) error
-	ListSnapshots(volume diskutil.VolumeInfo) ([]diskutil.Snapshot, error)
-	DeleteSnapshot(volume diskutil.VolumeInfo, snap diskutil.Snapshot) error
-}
-
-type restorer interface {
-	Restore(source, target diskutil.VolumeInfo, to, from diskutil.Snapshot) error
-	DestructiveRestore(source, target diskutil.VolumeInfo, to diskutil.Snapshot) error
 }
 
 // Cloneable returns nil if source is cloneable to all targets, where cloneable
@@ -159,8 +147,6 @@ func (c Cloner) cloneable(sourceSnaps, targetSnaps []diskutil.Snapshot) error {
 // Clone the latest snapshot in source to target, from the most recent common
 // snapshot present in both source and target.
 func (c Cloner) Clone(source, target string) error {
-	log.Printf("Cloning %q to %q...", source, target)
-
 	sourceInfo, err := c.diskutil.Info(source)
 	if err != nil {
 		return fmt.Errorf("error getting volume info of source %q: %v", source, err)
@@ -192,6 +178,13 @@ func (c Cloner) clone(source, target diskutil.VolumeInfo) error {
 	if err != nil {
 		return fmt.Errorf("error listing snapshots of source: %v", err)
 	}
+	if len(sourceSnaps) == 0 {
+		return errors.New("source does not contain any snapshots")
+	}
+	// TODO: document that this relies on the snapshots being in the right order.
+	latestSourceSnap := sourceSnaps[0]
+	fmt.Fprintf(c.stdout, "Latest snapshot in source:\n\t%s\n", latestSourceSnap)
+
 	targetSnaps, err := c.diskutil.ListSnapshots(target)
 	if err != nil {
 		return fmt.Errorf("error listing snapshots of target: %v", err)
@@ -200,20 +193,18 @@ func (c Cloner) clone(source, target diskutil.VolumeInfo) error {
 	if err != nil {
 		return fmt.Errorf("error finding latest snapshot in common between source and target: %v", err)
 	}
-	log.Printf("Found snapshot in common: %s", commonSnap)
+	fmt.Fprintf(c.stdout, "Snapshot in common:\n\t%s\n", commonSnap)
 
-	// TODO: document that this relies on the snapshots being in the right order.
-	latestSourceSnap := sourceSnaps[0]
-	log.Printf("Restoring to latest snapshot in source, %s, from common snapshot", latestSourceSnap)
+	fmt.Fprintln(c.stdout, "Restoring to latest snapshot in source from common snapshot...")
 	if err := c.asr.Restore(source, target, latestSourceSnap, commonSnap); err != nil {
 		return fmt.Errorf("error restoring: %v", err)
 	}
 
 	if c.prune {
-		log.Print("Pruning common snapshot from target...")
 		if err := c.diskutil.DeleteSnapshot(target, commonSnap); err != nil {
 			return fmt.Errorf("error deleting snapshot %q from target", commonSnap)
 		}
+		fmt.Fprintln(c.stdout, "Pruned common snapshot from target.")
 	}
 	return nil
 }
@@ -226,6 +217,10 @@ func (c Cloner) destructiveClone(source, target diskutil.VolumeInfo) error {
 	if len(sourceSnaps) == 0 {
 		return errors.New("source does not contain any snapshots")
 	}
+	// TODO: document that this relies on the snapshots being in the right order.
+	latestSourceSnap := sourceSnaps[0]
+	fmt.Fprintf(c.stdout, "Latest snapshot in source:\n\t%s\n", latestSourceSnap)
+
 	targetSnaps, err := c.diskutil.ListSnapshots(target)
 	if err != nil {
 		return fmt.Errorf("error listing snapshots of target: %v", err)
@@ -233,9 +228,7 @@ func (c Cloner) destructiveClone(source, target diskutil.VolumeInfo) error {
 	if len(targetSnaps) > 0 {
 		return errors.New("aborting because target contains snapshots that would be erased")
 	}
-	// TODO: document that this relies on the snapshots being in the right order.
-	latestSourceSnap := sourceSnaps[0]
-	log.Printf("Restoring to latest snapshot in source, %s", latestSourceSnap)
+	fmt.Fprintln(c.stdout, "Restoring to latest snapshot in source...")
 	if err := c.asr.DestructiveRestore(source, target, latestSourceSnap); err != nil {
 		return fmt.Errorf("error restoring: %v", err)
 	}
